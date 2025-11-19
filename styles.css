@@ -1,0 +1,233 @@
+:root {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background-color: #f5f5f5;
+  color: #222;
+}
+
+body {
+  margin: 0;
+}
+
+/* Header principal */
+.page-header {
+  background: #1b4b82;
+  color: #fff;
+  padding: 1.5rem 1.25rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  text-align: center; /* centrado del título y subtítulo */
+}
+
+.page-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.6rem;
+}
+
+.page-header p {
+  margin: 0;
+  opacity: 0.9;
+  font-size: 0.9rem;
+}
+
+/* Layout general: sidebar + contenido */
+.layout {
+  display: flex;
+  align-items: stretch;
+  max-width: 1400px;
+  margin: 1.5rem auto 2rem;
+  padding: 0 1rem;
+  gap: 1rem;
+}
+
+/* Sidebar de navegación */
+.sidebar {
+  width: 220px;
+  background: #ffffff;
+  border-radius: 0.9rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 1rem 0.75rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sidebar-title {
+  margin: 0 0 0.5rem;
+  padding: 0 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Botones de navegación */
+.nav-button {
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 0.7rem;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.9rem;
+  background: #f3f4f6;
+  color: #333;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.nav-button:hover {
+  background: #e3e6ec;
+}
+
+.nav-button.active {
+  background: #1b4b82;
+  color: #ffffff;
+}
+
+/* Contenido principal */
+.main-content {
+  flex: 1;
+}
+
+/* Contenedor interno de cada vista */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Secciones/vistas; solo una visible a la vez */
+.view-section {
+  display: none;
+}
+
+.view-section.active {
+  display: block;
+}
+
+/* Grid de tarjetas de gráficos */
+.grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+/* Tarjetas genéricas (gráficos y placeholders) */
+.card,
+.placeholder-card {
+  background: #fff;
+  border-radius: 1rem;
+  padding: 1rem 1.25rem 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.card h2,
+.placeholder-card h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.card p,
+.placeholder-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+/* Wrapper del canvas para que el gráfico tenga altura fija */
+.chart-wrapper {
+  position: relative;
+  margin-top: 0.75rem;
+  height: 280px;
+}
+
+/* Mensaje de error al cargar el JSON */
+.error-message {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: #ffe3e3;
+  color: #a60000;
+  font-size: 0.9rem;
+}
+
+/* Footer */
+footer {
+  text-align: center;
+  font-size: 0.8rem;
+  color: #777;
+  margin-bottom: 1.5rem;
+}
+
+/* Selector de año del gráfico 1 */
+.year-switch {
+  margin-top: 0.25rem;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.year-switch select {
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.4rem;
+  border: 1px solid #ccc;
+  font-size: 0.9rem;
+}
+
+/* Placeholders para modelos y mockup */
+.placeholder-note {
+  font-size: 0.9rem;
+  color: #444;
+  margin-top: 0.25rem;
+}
+
+.placeholder-list {
+  margin: 0.35rem 0 0.75rem 1.1rem;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.placeholder-box,
+.mockup-placeholder-box {
+  margin-top: 0.25rem;
+  padding: 1rem;
+  border-radius: 0.8rem;
+  border: 2px dashed #c0cad8;
+  background: #f8fafc;
+  font-size: 0.9rem;
+  color: #4b5563;
+  text-align: center;
+}
+
+/* Área de mockup un poco más alta */
+.mockup-area .mockup-placeholder-box {
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Responsivo básico */
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .sidebar-title {
+    width: 100%;
+  }
+
+  .nav-button {
+    flex: 1 1 auto;
+  }
+}

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Panel de tráfico en peajes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="page-header">
+    <h1>Panel de tráfico en peajes</h1>
+    <p>Gráficos construidos a partir de <code>resumen_graficas.json</code></p>
+  </header>
+
+  <div class="layout">
+    <!-- Sidebar de navegación -->
+    <nav class="sidebar">
+      <h2 class="sidebar-title">Secciones</h2>
+      <button class="nav-button active" data-target="view-eda">
+        Análisis exploratorio
+      </button>
+      <button class="nav-button" data-target="view-models">
+        Modelos predictivos
+      </button>
+      <button class="nav-button" data-target="view-mockup">
+        Mock up
+      </button>
+    </nav>
+
+    <!-- Contenido principal (cambia según la vista) -->
+    <main class="main-content">
+      <!-- Vista 1: Análisis exploratorio -->
+      <section id="view-eda" class="view-section active">
+        <div class="container">
+          <div id="error" class="error-message" style="display: none;">
+            No se pudo cargar <code>resumen_graficas.json</code>. Verifica que exista
+            en la misma carpeta que este archivo HTML.
+          </div>
+
+          <section class="grid">
+            <!-- Gráfico 1 -->
+            <article class="card">
+              <h2>Tráfico mensual total</h2>
+              <p>Evolución del tráfico total (Sentido 1+2 con exentos) para todos los peajes.</p>
+
+              <!-- Selector de año -->
+              <div class="year-switch">
+                <label for="yearSelect">Año:&nbsp;</label>
+                <select id="yearSelect"></select>
+              </div>
+
+              <div class="chart-wrapper">
+                <canvas id="chart1"></canvas>
+              </div>
+            </article>
+
+            <!-- Gráfico 2 -->
+            <article class="card">
+              <h2>Top 10 peajes por tráfico</h2>
+              <p>Peajes con mayor tráfico acumulado (Sentido 1+2 con exentos).</p>
+              <div class="chart-wrapper">
+                <canvas id="chart2"></canvas>
+              </div>
+            </article>
+
+            <!-- Gráfico 3 -->
+            <article class="card">
+              <h2>Distribución de exentos</h2>
+              <p>Proporción de vehículos exentos por categoría (I–VII).</p>
+              <div class="chart-wrapper">
+                <canvas id="chart3"></canvas>
+              </div>
+            </article>
+          </section>
+        </div>
+      </section>
+
+      <!-- Vista 2: Modelos predictivos -->
+      <section id="view-models" class="view-section">
+        <div class="container">
+          <div class="placeholder-card">
+            <h2>Modelos predictivos (Árboles de decisión)</h2>
+            <p>
+              Esta sección está reservada para los modelos predictivos que estás
+              implementando (por ejemplo, árboles de decisión para estimar tráfico,
+              clasificación de peajes, etc.).
+            </p>
+            <p class="placeholder-note">
+              Cuando los tengas listos, aquí podrás:
+            </p>
+            <ul class="placeholder-list">
+              <li>Incrustar gráficos (importancias de variables, árboles, curvas ROC, etc.).</li>
+              <li>Mostrar métricas de desempeño por modelo.</li>
+              <li>Comparar diferentes configuraciones o versiones de modelos.</li>
+            </ul>
+            <div class="placeholder-box">
+              Espacio disponible para visualizaciones y tablas de resultados de tus modelos.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Vista 3: Mock up -->
+      <section id="view-mockup" class="view-section">
+        <div class="container">
+          <div class="placeholder-card mockup-area">
+            <h2>Mock up de la solución</h2>
+            <p>
+              Esta sección está reservada para el mock up de la interfaz o prototipo
+              de la herramienta que visualizará o gestionará los datos de tráfico.
+            </p>
+            <p class="placeholder-note">
+              Más adelante podrás incrustar:
+            </p>
+            <ul class="placeholder-list">
+              <li>Capturas o imágenes del mock up.</li>
+              <li>Un iframe con un prototipo interactivo (Figma, HTML, etc.).</li>
+              <li>Componentes de UI ya implementados en HTML/CSS/JS.</li>
+            </ul>
+            <div class="mockup-placeholder-box">
+              Área reservada para el mock up<br />
+              (imagen, iframe, componentes, etc.)
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    Datos consolidados multi-año · Proyecto peajes UTPN
+  </footer>
+
+  <!-- Librería Chart.js desde CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Tu script principal -->
+  <script src="main.js"></script>
+</body>
+</html>
