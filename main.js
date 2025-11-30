@@ -16,19 +16,44 @@ const MONTH_LABELS = [
 // Años que quieres en el switch
 const YEAR_RANGE = ["2021", "2022", "2023", "2024", "2025"];
 
-// Mapping de peaje -> archivo de resultados
+// Mapping de peaje -> { sentido -> archivo }
 const PEAJE_MODEL_FILES = {
-  Sachica: "resultados_sachica_sentido_1.csv",
-  Bicentenario: "resultados_bicentenario_sentido_1.csv",
-  Casablanca: "resultados_casablanca_sentido_1.csv",
-  Cerritos: "resultados_cerritos_ii_sentido_1.csv",
-  "La Parada": "resultados_la_parada_sentido_2.csv",
-  "Tunel de la Linea": "resultados_peaje_tunel_la_linea_tolima_sentido_1.csv",
-  "Pto Triunfo": "resultados_pto_triunfo_sentido_1.csv",
+  Sachica: {
+    "1": "resultados_sachica_sentido_1.csv",
+    "2": "resultados_sachica_sentido_2.csv",
+  },
+  Bicentenario: {
+    "1": "resultados_bicentenario_sentido_1.csv",
+    "2": "resultados_bicentenario_sentido_2.csv",
+  },
+  Casablanca: {
+    "1": "resultados_casablanca_sentido_1.csv",
+    "2": "resultados_casablanca_sentido_2.csv",
+  },
+  Cerritos: {
+    "1": "resultados_cerritos_ii_sentido_1.csv",
+    "2": "resultados_cerritos_ii_sentido_2.csv",
+  },
+  "La Parada": {
+    "2": "resultados_la_parada_sentido_2.csv", // solo sentido 2 disponible
+  },
+  "Tunel de la Linea": {
+    "1": "resultados_peaje_tunel_la_linea_tolima_sentido_1.csv",
+    "2": "resultados_peaje_tunel_la_linea_quindio_sentido_2.csv",
+  },
+  "Pto Triunfo": {
+    "1": "resultados_pto_triunfo_sentido_1.csv",
+    "2": "resultados_pto_triunfo_sentido_2.csv",
+  },
 };
 
 let chart1Instance = null;
 let chart1DataByYear = null;
+
+// Gráficos de modelos
+let modelsSummaryChart = null;
+let traficoChart = null;
+let peajeModelChart = null;
 
 // ========== Utilidades generales ==========
 
@@ -83,7 +108,7 @@ async function loadCSV(path) {
   return parseCSV(text);
 }
 
-// ========== Gráfico 1: preparar datos por año ==========
+// ========== Gráfico 1 (EDA): preparar datos por año ==========
 
 function prepararDatosChart1(c1) {
   const dataByYear = {};
@@ -291,41 +316,31 @@ function setupNavigation() {
   });
 }
 
-// ========== Sección Modelos: 1) Resumen de modelos ==========
+// ========== Sección Modelos: 1) Resumen de modelos (gráfico) ==========
 
 async function initModelsSummary() {
   const summaryDiv = document.getElementById("models-summary-text");
-  const tableEl = document.getElementById("models-summary-table");
-  if (!summaryDiv || !tableEl) return;
+  const canvas = document.getElementById("models-summary-chart");
+  if (!summaryDiv || !canvas) return;
 
   summaryDiv.textContent = "Cargando resumen de modelos...";
-  tableEl.innerHTML = "";
 
   try {
     const { headers, rows } = await loadCSV("resumen_metricas_modelos.csv");
     if (!rows.length) {
-      summaryDiv.textContent = "No se encontraron modelos en resumen_metricas_modelos.csv.";
+      summaryDiv.textContent =
+        "No se encontraron modelos en resumen_metricas_modelos.csv.";
       return;
     }
 
     const peajes = new Set(rows.map((r) => r.peaje));
     const targets = new Set(rows.map((r) => r.target));
 
-    const metricRows = rows.map((r) => ({
-      modelo: r.modelo,
-      peaje: r.peaje,
-      target: r.target,
-      rmse_test: parseFloat(r.rmse_test),
-      mae_test: parseFloat(r.mae_test),
-      smape_test: parseFloat(r.smape_test),
-      mase_test: parseFloat(r.mase_test),
-    }));
-
-    const rmseVals = metricRows
-      .map((m) => m.rmse_test)
+    const rmseVals = rows
+      .map((r) => parseFloat(r.rmse_test))
       .filter((v) => !isNaN(v));
-    const smapeVals = metricRows
-      .map((m) => m.smape_test)
+    const smapeVals = rows
+      .map((r) => parseFloat(r.smape_test))
       .filter((v) => !isNaN(v));
 
     const minRMSE = rmseVals.length ? Math.min(...rmseVals) : NaN;
@@ -339,10 +354,11 @@ async function initModelsSummary() {
     const maxSMAPE = smapeVals.length ? Math.max(...smapeVals) : NaN;
 
     let bestModel = null;
-    metricRows.forEach((m) => {
-      if (isNaN(m.rmse_test)) return;
-      if (!bestModel || m.rmse_test < bestModel.rmse_test) {
-        bestModel = m;
+    rows.forEach((r) => {
+      const v = parseFloat(r.rmse_test);
+      if (isNaN(v)) return;
+      if (!bestModel || v < parseFloat(bestModel.rmse_test)) {
+        bestModel = r;
       }
     });
 
@@ -367,43 +383,62 @@ async function initModelsSummary() {
           ? `<p>
         El mejor modelo por RMSE de prueba corresponde al peaje
         <strong>${bestModel.peaje}</strong> (${bestModel.target}),
-        con RMSE test = <strong>${bestModel.rmse_test.toFixed(1)}</strong>.
+        con RMSE test = <strong>${parseFloat(
+          bestModel.rmse_test
+        ).toFixed(1)}</strong>.
       </p>`
           : ""
       }
     `;
 
-    // Tabla de resumen (peaje, target, rmse_test, mae_test, smape_test, mase_test)
-    const cols = [
-      { key: "peaje", label: "Peaje" },
-      { key: "target", label: "Target" },
-      { key: "rmse_test", label: "RMSE test" },
-      { key: "mae_test", label: "MAE test" },
-      { key: "smape_test", label: "sMAPE test (%)" },
-      { key: "mase_test", label: "MASE test" },
-    ];
-
-    let theadHtml = "<thead><tr>";
-    cols.forEach((c) => {
-      theadHtml += `<th>${c.label}</th>`;
+    // Gráfico de barras: RMSE test por peaje/target
+    const ctx = canvas.getContext("2d");
+    const labels = rows.map((r) => {
+      const t = r.target === "sentido_1" ? "S1" : r.target === "sentido_2" ? "S2" : r.target;
+      return `${r.peaje} (${t})`;
     });
-    theadHtml += "</tr></thead>";
-
-    let tbodyHtml = "<tbody>";
-    metricRows.forEach((m) => {
-      tbodyHtml += "<tr>";
-      cols.forEach((c) => {
-        let val = m[c.key];
-        if (typeof val === "number") {
-          val = isNaN(val) ? "N/D" : val.toFixed(2);
-        }
-        tbodyHtml += `<td>${val}</td>`;
-      });
-      tbodyHtml += "</tr>";
+    const data = rows.map((r) => {
+      const v = parseFloat(r.rmse_test);
+      return isNaN(v) ? null : v;
     });
-    tbodyHtml += "</tbody>";
 
-    tableEl.innerHTML = theadHtml + tbodyHtml;
+    if (modelsSummaryChart) {
+      modelsSummaryChart.destroy();
+    }
+
+    modelsSummaryChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "RMSE test",
+            data,
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            ticks: {
+              maxRotation: 60,
+              minRotation: 40,
+              autoSkip: false,
+            },
+          },
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: "RMSE test",
+            },
+          },
+        },
+      },
+    });
   } catch (err) {
     console.error("Error cargando resumen_metricas_modelos.csv:", err);
     summaryDiv.textContent =
@@ -411,16 +446,14 @@ async function initModelsSummary() {
   }
 }
 
-// ========== Sección Modelos: 2) trafico_limpio ==========
+// ========== Sección Modelos: 2) trafico_limpio (gráfico) ==========
 
 async function initTraficoSummary() {
   const summaryDiv = document.getElementById("trafico-summary");
-  const tableEl = document.getElementById("trafico-table");
-  if (!summaryDiv || !tableEl) return;
+  const canvas = document.getElementById("trafico-chart");
+  if (!summaryDiv || !canvas) return;
 
-  summaryDiv.textContent =
-    "Cargando información de trafico_limpio.csv...";
-  tableEl.innerHTML = "";
+  summaryDiv.textContent = "Cargando información de trafico_limpio.csv...";
 
   try {
     const { headers, rows } = await loadCSV("trafico_limpio.csv");
@@ -445,43 +478,76 @@ async function initTraficoSummary() {
     summaryDiv.innerHTML = `
       <p>El dataset <code>trafico_limpio.csv</code> contiene
       <strong>${totalReg}</strong> registros diarios de tráfico, cubriendo
-      <strong>${peajes.size}</strong> peajes y distintos tipos de día
-      (${Array.from(tiposDia).join(", ")}).</p>
+      <strong>${peajes.size}</strong> peajes.</p>
       <p>
         El rango temporal va aproximadamente desde
         <strong>${minFecha || "N/D"}</strong> hasta
         <strong>${maxFecha || "N/D"}</strong>.
       </p>
-      <p>Debajo se muestra una muestra de las primeras filas del dataset.</p>
+      <p>Abajo se muestra el tráfico promedio total por tipo de día.</p>
     `;
 
-    // Tabla de muestra (primeras 10 filas)
-    const columnsToShow = [
-      "fecha",
-      "peaje",
-      "sentido_1",
-      "sentido_2",
-      "total",
-      "tipo_dia",
-    ];
-
-    let theadHtml = "<thead><tr>";
-    columnsToShow.forEach((c) => {
-      theadHtml += `<th>${c}</th>`;
+    // Agrupar por tipo_dia y promediar "total"
+    const grupos = {};
+    rows.forEach((r) => {
+      const tipo = r.tipo_dia || "desconocido";
+      const total = parseFloat(r.total);
+      if (!grupos[tipo]) {
+        grupos[tipo] = { suma: 0, n: 0 };
+      }
+      if (!isNaN(total)) {
+        grupos[tipo].suma += total;
+        grupos[tipo].n += 1;
+      }
     });
-    theadHtml += "</tr></thead>";
 
-    let tbodyHtml = "<tbody>";
-    rows.slice(0, 10).forEach((r) => {
-      tbodyHtml += "<tr>";
-      columnsToShow.forEach((c) => {
-        tbodyHtml += `<td>${r[c] !== undefined ? r[c] : ""}</td>`;
-      });
-      tbodyHtml += "</tr>";
+    const tipos = Object.keys(grupos);
+    const labels = tipos.map((t) =>
+      t
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+    );
+    const data = tipos.map((t) =>
+      grupos[t].n > 0 ? grupos[t].suma / grupos[t].n : 0
+    );
+
+    if (traficoChart) {
+      traficoChart.destroy();
+    }
+
+    const ctx = canvas.getContext("2d");
+    traficoChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Tráfico promedio diario (total)",
+            data,
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: "Tipo de día",
+            },
+          },
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: "Promedio de vehículos por día",
+            },
+          },
+        },
+      },
     });
-    tbodyHtml += "</tbody>";
-
-    tableEl.innerHTML = theadHtml + tbodyHtml;
   } catch (err) {
     console.error("Error cargando trafico_limpio.csv:", err);
     summaryDiv.textContent =
@@ -489,23 +555,42 @@ async function initTraficoSummary() {
   }
 }
 
-// ========== Sección Modelos: 3) Modelo por peaje ==========
+// ========== Sección Modelos: 3) Modelo por peaje y sentido (gráfico) ==========
 
-async function loadPeajeModel(peajeKey) {
-  const file = PEAJE_MODEL_FILES[peajeKey];
+async function loadPeajeModel(peajeKey, sentido) {
+  const filesBySentido = PEAJE_MODEL_FILES[peajeKey] || {};
+  const file = filesBySentido[sentido];
+
   const summaryDiv = document.getElementById("peaje-model-summary");
-  const tableEl = document.getElementById("peaje-model-table");
+  const canvas = document.getElementById("peaje-model-chart");
 
-  if (!file || !summaryDiv || !tableEl) return;
+  if (!summaryDiv || !canvas) return;
 
-  summaryDiv.textContent = "Cargando modelo para " + peajeKey + "...";
-  tableEl.innerHTML = "";
+  if (!file) {
+    summaryDiv.innerHTML = `
+      <p>No hay archivo de resultados configurado para el peaje
+      <strong>${peajeKey}</strong> en el sentido <strong>${sentido}</strong>.</p>
+      <p>Prueba cambiando el sentido o seleccionando otro peaje.</p>
+    `;
+    if (peajeModelChart) {
+      peajeModelChart.destroy();
+      peajeModelChart = null;
+    }
+    return;
+  }
+
+  summaryDiv.textContent =
+    "Cargando modelo para " + peajeKey + " (sentido " + sentido + ")...";
 
   try {
     const { headers, rows } = await loadCSV(file);
     if (!rows.length) {
       summaryDiv.textContent =
         "No se encontraron datos en " + file + ".";
+      if (peajeModelChart) {
+        peajeModelChart.destroy();
+        peajeModelChart = null;
+      }
       return;
     }
 
@@ -519,22 +604,6 @@ async function loadPeajeModel(peajeKey) {
       return isNaN(v) ? "N/D" : v.toFixed(2);
     }
 
-    summaryDiv.innerHTML = `
-      <p><strong>Peaje:</strong> ${nombrePeaje}</p>
-      <p><strong>Modelo:</strong> ${modelo}</p>
-      <p><strong>Target:</strong> ${target}</p>
-      <p>
-        <strong>Métricas (misma configuración en todas las filas del set)</strong><br/>
-        RMSE val = ${fmt("rmse_val")}, MAE val = ${fmt("mae_val")}, sMAPE val = ${fmt(
-      "smape_val"
-    )}%, MASE val = ${fmt("mase_val")}<br/>
-        RMSE test = ${fmt("rmse_test")}, MAE test = ${fmt(
-      "mae_test"
-    )}, sMAPE test = ${fmt("smape_test")}%, MASE test = ${fmt("mase_test")}
-      </p>
-      <p>Debajo se muestra una muestra de las últimas predicciones del conjunto de prueba.</p>
-    `;
-
     // Filtrar filas de test y ordenarlas por fecha
     const testRows = rows.filter(
       (r) => (r.set || "").toLowerCase() === "test"
@@ -545,66 +614,122 @@ async function loadPeajeModel(peajeKey) {
       return fa.localeCompare(fb);
     });
 
-    const lastRows = testRows.slice(-15); // últimas 15 observaciones de test
+    const lastRows = testRows.slice(-30); // últimas 30 observaciones de test
 
-    const cols = ["fecha", "y_real", "y_pred", "set"];
-
-    let theadHtml = "<thead><tr>";
-    cols.forEach((c) => {
-      theadHtml += `<th>${c}</th>`;
+    const labels = lastRows.map((r) => r.fecha || "");
+    const yReal = lastRows.map((r) => {
+      const v = parseFloat(r.y_real);
+      return isNaN(v) ? null : v;
     });
-    theadHtml += "</tr></thead>";
-
-    let tbodyHtml = "<tbody>";
-    lastRows.forEach((r) => {
-      tbodyHtml += "<tr>";
-      cols.forEach((c) => {
-        let val = r[c] !== undefined ? r[c] : "";
-        if (c === "y_real" || c === "y_pred") {
-          const num = parseFloat(val);
-          val = isNaN(num) ? val : num.toFixed(0);
-        }
-        tbodyHtml += `<td>${val}</td>`;
-      });
-      tbodyHtml += "</tr>";
+    const yPred = lastRows.map((r) => {
+      const v = parseFloat(r.y_pred);
+      return isNaN(v) ? null : v;
     });
-    tbodyHtml += "</tbody>";
 
-    tableEl.innerHTML = theadHtml + tbodyHtml;
+    summaryDiv.innerHTML = `
+      <p><strong>Peaje:</strong> ${nombrePeaje}</p>
+      <p><strong>Modelo:</strong> ${modelo}</p>
+      <p><strong>Target:</strong> ${target}</p>
+      <p>
+        <strong>Métricas (configuración del modelo)</strong><br/>
+        RMSE val = ${fmt("rmse_val")}, MAE val = ${fmt("mae_val")}, sMAPE val = ${fmt(
+      "smape_val"
+    )}%, MASE val = ${fmt("mase_val")}<br/>
+        RMSE test = ${fmt("rmse_test")}, MAE test = ${fmt(
+      "mae_test"
+    )}, sMAPE test = ${fmt("smape_test")}%, MASE test = ${fmt("mase_test")}
+      </p>
+      <p>Abajo se muestra la comparación entre valores reales y predichos en el conjunto de prueba (últimos días).</p>
+    `;
+
+    if (peajeModelChart) {
+      peajeModelChart.destroy();
+    }
+
+    const ctx = canvas.getContext("2d");
+    peajeModelChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "y_real (test)",
+            data: yReal,
+            borderWidth: 2,
+            tension: 0.2,
+          },
+          {
+            label: "y_pred (test)",
+            data: yPred,
+            borderWidth: 2,
+            tension: 0.2,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: "Fecha",
+            },
+          },
+          y: {
+            beginAtZero: false,
+            title: {
+              display: true,
+              text: "Vehículos/día",
+            },
+          },
+        },
+      },
+    });
   } catch (err) {
     console.error("Error cargando archivo para peaje", peajeKey, err);
     summaryDiv.textContent =
       "Error al cargar el archivo " +
       file +
       ". Verifica que exista en la misma carpeta.";
+    if (peajeModelChart) {
+      peajeModelChart.destroy();
+      peajeModelChart = null;
+    }
   }
 }
 
 function setupPeajeSelector() {
-  const select = document.getElementById("peaje-select");
-  if (!select) return;
+  const peajeSelect = document.getElementById("peaje-select");
+  const sentidoSelect = document.getElementById("sentido-select");
+  if (!peajeSelect || !sentidoSelect) return;
 
   // Llenar el select con las opciones de peajes
-  select.innerHTML = "";
+  peajeSelect.innerHTML = "";
   Object.keys(PEAJE_MODEL_FILES).forEach((peaje) => {
     const opt = document.createElement("option");
     opt.value = peaje;
     opt.textContent = peaje;
-    select.appendChild(opt);
+    peajeSelect.appendChild(opt);
   });
 
-  // Cambiar modelo al cambiar el peaje
-  select.addEventListener("change", (e) => {
-    const peajeKey = e.target.value;
-    loadPeajeModel(peajeKey);
-  });
+  // Función común para actualizar el gráfico
+  function updatePeajeModel() {
+    const peajeKey = peajeSelect.value;
+    const sentido = sentidoSelect.value;
+    loadPeajeModel(peajeKey, sentido);
+  }
 
-  // Cargar por defecto el primero
+  peajeSelect.addEventListener("change", updatePeajeModel);
+  sentidoSelect.addEventListener("change", updatePeajeModel);
+
+  // Valor inicial: primer peaje y sentido 1
   const firstKey = Object.keys(PEAJE_MODEL_FILES)[0];
   if (firstKey) {
-    select.value = firstKey;
-    loadPeajeModel(firstKey);
+    peajeSelect.value = firstKey;
   }
+  sentidoSelect.value = "1";
+  updatePeajeModel();
 }
 
 // ========== Init ==========
@@ -616,7 +741,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const resumenGraficas = await cargarResumen();
   crearGraficos(resumenGraficas);
 
-  // Sección de modelos (resumen, trafico_limpio, selector de peaje)
+  // Sección de modelos (resumen, trafico_limpio, selector de peaje/sentido)
   await initModelsSummary();
   await initTraficoSummary();
   setupPeajeSelector();
