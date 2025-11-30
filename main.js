@@ -1201,4 +1201,3 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Interfaz del operario
   await initOperatorInterface();
 });
-
