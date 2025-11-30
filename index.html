@@ -223,14 +223,18 @@
           <article class="card">
             <h2>Interfaz del operario</h2>
             <p>
-              Selecciona un peaje y un mes para estimar cuántos carriles deben quedar
-              habilitados en cada sentido, a partir de los modelos de tráfico entrenados.
+              Selecciona un peaje, un año y un mes para estimar cuántos carriles deben
+              quedar habilitados en cada sentido, a partir de los modelos de tráfico entrenados.
             </p>
 
             <div class="selector-row">
               <div class="peaje-select-row">
                 <label for="operator-peaje-select">Peaje:&nbsp;</label>
                 <select id="operator-peaje-select"></select>
+              </div>
+              <div class="sentido-select-row">
+                <label for="operator-year-select">Año:&nbsp;</label>
+                <select id="operator-year-select"></select>
               </div>
               <div class="sentido-select-row">
                 <label for="operator-month-select">Mes:&nbsp;</label>
@@ -240,6 +244,19 @@
 
             <div id="operator-result-text" class="small-text" style="margin-top: 0.5rem;">
               Cargando datos de modelos para la interfaz del operario...
+            </div>
+
+            <!-- Layout visual de la estación y carriles -->
+            <div id="operator-layout" class="operator-layout"></div>
+            <div class="operator-legend">
+              <div class="operator-legend-item">
+                <span class="operator-legend-swatch operator-legend-s1"></span>
+                <span>Sentido 1</span>
+              </div>
+              <div class="operator-legend-item">
+                <span class="operator-legend-swatch operator-legend-s2"></span>
+                <span>Sentido 2</span>
+              </div>
             </div>
 
             <div class="chart-wrapper">

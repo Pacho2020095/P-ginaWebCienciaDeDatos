@@ -243,6 +243,104 @@ footer {
   justify-content: center;
 }
 
+/* Layout de la estación para el operario */
+.operator-layout {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 0.8rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  overflow-x: auto;
+}
+
+.operator-station {
+  min-width: 80px;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: #4b5563;
+  color: #fff;
+  font-size: 0.9rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.operator-lanes {
+  display: flex;
+  gap: 1rem;
+}
+
+.operator-lane {
+  min-width: 70px;
+  background: #e5e7eb;
+  border-radius: 0.6rem;
+  padding: 0.4rem 0.5rem 0.6rem;
+  text-align: center;
+  font-size: 0.8rem;
+  position: relative;
+}
+
+.operator-lane-name {
+  margin-bottom: 0.3rem;
+  font-style: italic;
+  color: #4b5563;
+}
+
+.operator-arrow {
+  width: 0;
+  height: 0;
+  margin: 0.1rem auto;
+}
+
+.operator-arrow.up {
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 18px solid #facc15; /* amarillo */
+}
+
+.operator-arrow.down {
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 18px solid #60a5fa; /* azul */
+}
+
+.operator-lane-empty {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  margin-top: 0.2rem;
+}
+
+/* Leyenda de sentidos */
+.operator-legend {
+  margin-top: 0.6rem;
+  display: flex;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: #4b5563;
+}
+
+.operator-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.operator-legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+
+.operator-legend-s1 {
+  background: #60a5fa;
+}
+
+.operator-legend-s2 {
+  background: #facc15;
+}
+
 /* Responsivo básico */
 @media (max-width: 768px) {
   .layout {
@@ -264,3 +362,4 @@ footer {
     flex: 1 1 auto;
   }
 }
+
