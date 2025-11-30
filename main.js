@@ -42,8 +42,8 @@ const PEAJE_MODEL_FILES = {
     "2": "resultados_peaje_tunel_la_linea_quindio_sentido_2.csv",
   },
   "Pto Triunfo": {
-    "1": "resultados_pto_triunfo_sentido_1.csv",
-    "2": "resultados_pto_triunfo_sentido_2.csv",
+    "1": "resultados_pto_triунfo_sentido_1.csv",
+    "2": "resultados_pto_triунfo_sentido_2.csv",
   },
 };
 
@@ -54,6 +54,9 @@ let chart1DataByYear = null;
 let modelsSummaryChart = null;
 let traficoChart = null;
 let peajeModelChart = null;
+
+// Datos crudos de trafico_limpio
+let traficoRows = null;
 
 // ========== Utilidades generales ==========
 
@@ -446,17 +449,165 @@ async function initModelsSummary() {
   }
 }
 
-// ========== Sección Modelos: 2) trafico_limpio (gráfico) ==========
+// ========== Sección Modelos: 2) trafico_limpio (gráfico con selector) ==========
+
+function updateTraficoChart(mode, peaje, sentido) {
+  const canvas = document.getElementById("trafico-chart");
+  if (!canvas || !traficoRows) return;
+
+  const ctx = canvas.getContext("2d");
+
+  const grupos = {};
+  traficoRows.forEach((r) => {
+    const tipo = r.tipo_dia || "desconocido";
+
+    // Filtrado por peaje en modo peaje-sentido
+    if (mode === "peaje-sentido") {
+      if (!peaje || r.peaje !== peaje) return;
+    }
+
+    let val;
+    if (mode === "general") {
+      // componente general: promedio de la columna "total"
+      val = parseFloat(r.total);
+    } else {
+      // por peaje y sentido: usar sentido_1 o sentido_2
+      if (sentido === "1") {
+        val = parseFloat(r.sentido_1);
+      } else if (sentido === "2") {
+        val = parseFloat(r.sentido_2);
+      } else {
+        val = parseFloat(r.total);
+      }
+    }
+
+    if (!grupos[tipo]) {
+      grupos[tipo] = { suma: 0, n: 0 };
+    }
+    if (!isNaN(val)) {
+      grupos[tipo].suma += val;
+      grupos[tipo].n += 1;
+    }
+  });
+
+  const tipos = Object.keys(grupos);
+  const labels = tipos.map((t) =>
+    t
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+  const data = tipos.map((t) =>
+    grupos[t].n > 0 ? grupos[t].suma / grupos[t].n : 0
+  );
+
+  let labelText;
+  if (mode === "general") {
+    labelText = "Tráfico promedio diario (total, todos los peajes)";
+  } else {
+    labelText = `Tráfico promedio diario - ${peaje} - sentido ${sentido}`;
+  }
+
+  if (traficoChart) {
+    traficoChart.destroy();
+  }
+
+  traficoChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: labelText,
+          data,
+          borderWidth: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: "Tipo de día",
+          },
+        },
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: "Promedio de vehículos por día",
+          },
+        },
+      },
+    },
+  });
+}
+
+function setupTraficoControls() {
+  const modeSelect = document.getElementById("trafico-mode");
+  const peajeSelect = document.getElementById("trafico-peaje-select");
+  const sentidoSelect = document.getElementById("trafico-sentido-select");
+  const peajeRow = document.querySelector(".trafico-peaje-row");
+  const sentidoRow = document.querySelector(".trafico-sentido-row");
+
+  if (!modeSelect || !peajeSelect || !sentidoSelect || !traficoRows) return;
+
+  // Poblar peajes desde el dataset
+  const peajesSet = new Set();
+  traficoRows.forEach((r) => {
+    if (r.peaje) peajesSet.add(r.peaje);
+  });
+  const peajes = Array.from(peajesSet).sort();
+  peajeSelect.innerHTML = "";
+  peajes.forEach((p) => {
+    const opt = document.createElement("option");
+    opt.value = p;
+    opt.textContent = p;
+    peajeSelect.appendChild(opt);
+  });
+
+  function refreshVisibility() {
+    const mode = modeSelect.value;
+    if (mode === "peaje-sentido") {
+      if (peajeRow) peajeRow.style.display = "flex";
+      if (sentidoRow) sentidoRow.style.display = "flex";
+    } else {
+      if (peajeRow) peajeRow.style.display = "none";
+      if (sentidoRow) sentidoRow.style.display = "none";
+    }
+  }
+
+  function updateFromControls() {
+    const mode = modeSelect.value;
+    const peaje = peajeSelect.value;
+    const sentido = sentidoSelect.value;
+    updateTraficoChart(mode, peaje, sentido);
+  }
+
+  modeSelect.addEventListener("change", () => {
+    refreshVisibility();
+    updateFromControls();
+  });
+  peajeSelect.addEventListener("change", updateFromControls);
+  sentidoSelect.addEventListener("change", updateFromControls);
+
+  // Estado inicial: vista general
+  modeSelect.value = "general";
+  refreshVisibility();
+  updateFromControls();
+}
 
 async function initTraficoSummary() {
   const summaryDiv = document.getElementById("trafico-summary");
-  const canvas = document.getElementById("trafico-chart");
-  if (!summaryDiv || !canvas) return;
+  if (!summaryDiv) return;
 
   summaryDiv.textContent = "Cargando información de trafico_limpio.csv...";
 
   try {
     const { headers, rows } = await loadCSV("trafico_limpio.csv");
+    traficoRows = rows;
     if (!rows.length) {
       summaryDiv.textContent =
         "No se encontraron filas en trafico_limpio.csv.";
@@ -465,8 +616,6 @@ async function initTraficoSummary() {
 
     const totalReg = rows.length;
     const peajes = new Set(rows.map((r) => r.peaje));
-    const tiposDia = new Set(rows.map((r) => r.tipo_dia));
-
     const fechas = rows.map((r) => r.fecha).filter(Boolean);
     let minFecha = null;
     let maxFecha = null;
@@ -484,70 +633,10 @@ async function initTraficoSummary() {
         <strong>${minFecha || "N/D"}</strong> hasta
         <strong>${maxFecha || "N/D"}</strong>.
       </p>
-      <p>Abajo se muestra el tráfico promedio total por tipo de día.</p>
+      <p>Puedes alternar entre una vista general y una vista filtrada por peaje y sentido.</p>
     `;
 
-    // Agrupar por tipo_dia y promediar "total"
-    const grupos = {};
-    rows.forEach((r) => {
-      const tipo = r.tipo_dia || "desconocido";
-      const total = parseFloat(r.total);
-      if (!grupos[tipo]) {
-        grupos[tipo] = { suma: 0, n: 0 };
-      }
-      if (!isNaN(total)) {
-        grupos[tipo].suma += total;
-        grupos[tipo].n += 1;
-      }
-    });
-
-    const tipos = Object.keys(grupos);
-    const labels = tipos.map((t) =>
-      t
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase())
-    );
-    const data = tipos.map((t) =>
-      grupos[t].n > 0 ? grupos[t].suma / grupos[t].n : 0
-    );
-
-    if (traficoChart) {
-      traficoChart.destroy();
-    }
-
-    const ctx = canvas.getContext("2d");
-    traficoChart = new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels,
-        datasets: [
-          {
-            label: "Tráfico promedio diario (total)",
-            data,
-            borderWidth: 1,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          x: {
-            title: {
-              display: true,
-              text: "Tipo de día",
-            },
-          },
-          y: {
-            beginAtZero: true,
-            title: {
-              display: true,
-              text: "Promedio de vehículos por día",
-            },
-          },
-        },
-      },
-    });
+    setupTraficoControls();
   } catch (err) {
     console.error("Error cargando trafico_limpio.csv:", err);
     summaryDiv.textContent =
@@ -713,7 +802,6 @@ function setupPeajeSelector() {
     peajeSelect.appendChild(opt);
   });
 
-  // Función común para actualizar el gráfico
   function updatePeajeModel() {
     const peajeKey = peajeSelect.value;
     const sentido = sentidoSelect.value;
@@ -746,3 +834,4 @@ document.addEventListener("DOMContentLoaded", async () => {
   await initTraficoSummary();
   setupPeajeSelector();
 });
+

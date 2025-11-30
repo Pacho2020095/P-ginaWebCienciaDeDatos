@@ -183,7 +183,7 @@ footer {
   color: #444;
 }
 
-/* Fila de selectores de peaje y sentido */
+/* Fila de selectores (en modelos y trafico) */
 .selector-row {
   margin-top: 0.4rem;
   display: flex;
@@ -193,7 +193,8 @@ footer {
 }
 
 .peaje-select-row,
-.sentido-select-row {
+.sentido-select-row,
+.trafico-mode-row {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -201,7 +202,8 @@ footer {
 }
 
 .peaje-select-row select,
-.sentido-select-row select {
+.sentido-select-row select,
+.trafico-mode-row select {
   padding: 0.2rem 0.4rem;
   border-radius: 0.4rem;
   border: 1px solid #ccc;

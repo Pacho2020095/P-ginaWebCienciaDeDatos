@@ -98,12 +98,36 @@
             <article class="card">
               <h2>Datos de tráfico (trafico_limpio)</h2>
               <p>
-                Comportamiento agregado por tipo de día (entre semana, festivo y fin de semana)
-                a partir de <code>trafico_limpio.csv</code>.
+                Comportamiento agregado a partir de <code>trafico_limpio.csv</code>.
+                Puedes ver un promedio general o filtrar por peaje y sentido.
               </p>
               <div id="trafico-summary" class="small-text">
                 Cargando información de <code>trafico_limpio.csv</code>...
               </div>
+
+              <!-- 🔽 NUEVO: selector de vista / peaje / sentido -->
+              <div class="selector-row trafico-selector-row">
+                <div class="trafico-mode-row">
+                  <label for="trafico-mode">Vista:&nbsp;</label>
+                  <select id="trafico-mode">
+                    <option value="general">General (todos los peajes)</option>
+                    <option value="peaje-sentido">Por peaje y sentido</option>
+                  </select>
+                </div>
+                <div class="peaje-select-row trafico-peaje-row" style="display: none;">
+                  <label for="trafico-peaje-select">Peaje:&nbsp;</label>
+                  <select id="trafico-peaje-select"></select>
+                </div>
+                <div class="sentido-select-row trafico-sentido-row" style="display: none;">
+                  <label for="trafico-sentido-select">Sentido:&nbsp;</label>
+                  <select id="trafico-sentido-select">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                  </select>
+                </div>
+              </div>
+              <!-- 🔼 NUEVO -->
+
               <div class="chart-wrapper">
                 <canvas id="trafico-chart"></canvas>
               </div>
