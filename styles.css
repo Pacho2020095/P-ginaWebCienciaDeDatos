@@ -308,6 +308,26 @@ footer {
   background: #facc15;
 }
 
+/* Indicador de "datos de modelo" */
+.model-indicator {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #92400e;
+}
+
+.model-lamp {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fbbf24;
+  border: 1px solid #f59e0b;
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.9);
+  flex-shrink: 0;
+}
+
 /* Responsivo básico */
 @media (max-width: 768px) {
   .layout {
@@ -317,7 +337,7 @@ footer {
   .sidebar {
     width: 100%;
     flex-direction: row;
-    align-items: center;
+    align-items:center;
     flex-wrap: wrap;
   }
 

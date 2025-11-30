@@ -75,7 +75,7 @@ let peajeModelChart = null;
 // Datos crudos
 let traficoRows = null;
 let modelsRows = null; // resumen_metricas_modelos.csv
-let operatorData = null; // {peaje: {dateKey: { "1": value, "2": value }}}
+let operatorData = null; // {peaje: {dateKey: { s1: {traffic,fromModel}, s2: {...} }}}
 let operatorYears = []; // años disponibles en los modelos (para el select)
 
 // ========== Utilidades generales ==========
@@ -168,7 +168,7 @@ function prepararDatosChart1(c1) {
   let defaultYear = YEAR_RANGE[0];
   for (let i = YEAR_RANGE.length - 1; i >= 0; i--) {
     const y = YEAR_RANGE[i];
-    const arr = (dataByYear[y] || []);
+    const arr = dataByYear[y] || [];
     const tieneDatos = arr.some((v) => v != null && !isNaN(v));
     if (tieneDatos) {
       defaultYear = y;
@@ -396,8 +396,8 @@ function computeModelsSummaryHTML(rows, mode, peaje, sentido) {
       El mejor modelo por RMSE de prueba corresponde al peaje
       <strong>${bestModel.peaje}</strong> (${bestModel.target}),
       con RMSE test = <strong>${parseFloat(
-      bestModel.rmse_test
-    ).toFixed(1)}</strong>.
+            bestModel.rmse_test
+          ).toFixed(1)}</strong>.
     </p>`
         : ""
     }
@@ -845,11 +845,11 @@ async function loadPeajeModel(peajeKey, sentido) {
       <p>
         <strong>Métricas (configuración del modelo)</strong><br/>
         RMSE val = ${fmt("rmse_val")}, MAE val = ${fmt("mae_val")}, sMAPE val = ${fmt(
-      "smape_val"
-    )}%, MASE val = ${fmt("mase_val")}<br/>
+          "smape_val"
+        )}%, MASE val = ${fmt("mase_val")}<br/>
         RMSE test = ${fmt("rmse_test")}, MAE test = ${fmt(
-      "mae_test"
-    )}, sMAPE test = ${fmt("smape_test")}%, MASE test = ${fmt("mase_test")}
+          "mae_test"
+        )}, sMAPE test = ${fmt("smape_test")}%, MASE test = ${fmt("mase_test")}
       </p>
       <p>Abajo se muestra la comparación entre valores reales y predichos en el conjunto de prueba (últimos días).</p>
     `;
@@ -945,7 +945,7 @@ function setupPeajeSelector() {
 
 // ========== Interfaz del operario (por día) ==========
 
-// Parsear fecha tipo "YYYY-MM-DD" o "DD/MM/YYYY" etc. -> {year, month, day}
+// Parsear fecha tipo "YYYY-MM-DD" o "DD/MM/YYYY" -> {year, month, day}
 function parseYMD(fechaStr) {
   if (!fechaStr) return null;
   const s = fechaStr.toString().trim();
@@ -1027,34 +1027,69 @@ async function buildOperatorData() {
           const dateKey = canonicalDateKey(year, month, day);
           yearsSet.add(yearKey);
 
-          // Determinar sentido
-          let sense = null;
-          const target = (r.target || "").toLowerCase();
-          if (target === "sentido_1") sense = "1";
-          else if (target === "sentido_2") sense = "2";
-          else {
-            const fname = file.toLowerCase();
-            if (fname.includes("sentido_1")) sense = "1";
-            else if (fname.includes("sentido_2")) sense = "2";
-          }
-          if (!sense) return;
+          const isModelZone = dateKey >= "2025-09-16";
 
-          // Valor de tráfico: primero y_pred, luego y_real como respaldo
-          let val = parseFloat(r.y_pred);
-          if (isNaN(val)) {
-            val = parseFloat(r.y_real);
+          const s1Raw = r.sentido_1 ?? r.SENTIDO_1;
+          const s2Raw = r.sentido_2 ?? r.SENTIDO_2;
+
+          let v1 = null;
+          let v2 = null;
+          let m1 = false;
+          let m2 = false;
+
+          if (!isModelZone) {
+            if (s1Raw !== undefined && s1Raw !== "") {
+              const n1 = parseFloat(s1Raw);
+              if (!isNaN(n1)) v1 = n1;
+            }
+            if (s2Raw !== undefined && s2Raw !== "") {
+              const n2 = parseFloat(s2Raw);
+              if (!isNaN(n2)) v2 = n2;
+            }
           }
-          if (isNaN(val)) return;
+
+          const ypred = parseFloat(r.y_pred);
+          if (isModelZone && !isNaN(ypred)) {
+            const half = ypred / 2;
+            v1 = half;
+            v2 = half;
+            m1 = true;
+            m2 = true;
+          } else if (!isNaN(ypred)) {
+            const half = ypred / 2;
+            if (v1 === null) {
+              v1 = half;
+              m1 = true;
+            }
+            if (v2 === null) {
+              v2 = half;
+              m2 = true;
+            }
+          }
+
+          if (v1 === null && v2 === null) return;
 
           if (!operatorData[peajeKey][dateKey]) {
-            operatorData[peajeKey][dateKey] = {};
+            operatorData[peajeKey][dateKey] = { s1: null, s2: null };
           }
-          // Si ya hay un valor, promediamos (por seguridad)
-          const prev = operatorData[peajeKey][dateKey][sense];
-          if (prev == null) {
-            operatorData[peajeKey][dateKey][sense] = val;
-          } else {
-            operatorData[peajeKey][dateKey][sense] = (prev + val) / 2;
+
+          const slot = operatorData[peajeKey][dateKey];
+
+          if (v1 !== null) {
+            if (!slot.s1) {
+              slot.s1 = { traffic: v1, fromModel: m1 };
+            } else {
+              slot.s1.traffic = (slot.s1.traffic + v1) / 2;
+              slot.s1.fromModel = slot.s1.fromModel || m1;
+            }
+          }
+          if (v2 !== null) {
+            if (!slot.s2) {
+              slot.s2 = { traffic: v2, fromModel: m2 };
+            } else {
+              slot.s2.traffic = (slot.s2.traffic + v2) / 2;
+              slot.s2.fromModel = slot.s2.fromModel || m2;
+            }
           }
         });
       } catch (err) {
@@ -1134,8 +1169,11 @@ function updateOperatorView() {
   const peajeData = operatorData[peajeKey] || {};
   const daily = peajeData[dateKey] || {};
 
-  const traffic1 = daily["1"];
-  const traffic2 = daily["2"];
+  const s1 = daily.s1 || null;
+  const s2 = daily.s2 || null;
+
+  const traffic1 = s1 ? s1.traffic : null;
+  const traffic2 = s2 ? s2.traffic : null;
 
   const lanes1 = computeLanesFromTraffic(traffic1);
   const lanes2 = computeLanesFromTraffic(traffic2);
@@ -1158,9 +1196,7 @@ function updateOperatorView() {
       ).toLocaleString("es-CO")}</strong> veh/día → habilitar <strong>${lanes1}</strong> carril(es).`
     );
   } else {
-    parts.push(
-      `Sentido <strong>1</strong>: sin datos para esta fecha.`
-    );
+    parts.push(`Sentido <strong>1</strong>: sin datos para esta fecha.`);
   }
 
   if (lanes2 !== null) {
@@ -1170,10 +1206,12 @@ function updateOperatorView() {
       ).toLocaleString("es-CO")}</strong> veh/día → habilitar <strong>${lanes2}</strong> carril(es).`
     );
   } else {
-    parts.push(
-      `Sentido <strong>2</strong>: sin datos para esta fecha.`
-    );
+    parts.push(`Sentido <strong>2</strong>: sin datos para esta fecha.`);
   }
+
+  const usesModel =
+    (s1 && s1.fromModel && lanes1 !== null) ||
+    (s2 && s2.fromModel && lanes2 !== null);
 
   resultDiv.innerHTML = `
     <p><strong>Peaje:</strong> ${peajeKey}</p>
@@ -1183,6 +1221,14 @@ function updateOperatorView() {
       Reglas de dimensionamiento por sentido (vehículos/día):<br/>
       ≤ 2.880 → 1 carril · 2.880–5.760 → 2 carriles · 5.760–8.640 → 3 carriles · &gt; 8.640 → 4 carriles.
     </p>
+    ${
+      usesModel
+        ? `<div class="model-indicator">
+             <span class="model-lamp"></span>
+             <span>Para esta fecha se usan valores <strong>estimados por el modelo</strong> (<code>y_pred</code>), repartidos en partes iguales entre los sentidos 1 y 2.</span>
+           </div>`
+        : ""
+    }
   `;
 
   // Layout visual de estación y carriles
