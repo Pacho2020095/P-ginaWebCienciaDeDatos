@@ -78,25 +78,59 @@
       <!-- Vista 2: Modelos predictivos -->
       <section id="view-models" class="view-section">
         <div class="container">
-          <div class="placeholder-card">
-            <h2>Modelos predictivos (Árboles de decisión)</h2>
-            <p>
-              Esta sección está reservada para los modelos predictivos que estás
-              implementando (por ejemplo, árboles de decisión para estimar tráfico,
-              clasificación de peajes, etc.).
-            </p>
-            <p class="placeholder-note">
-              Cuando los tengas listos, aquí podrás:
-            </p>
-            <ul class="placeholder-list">
-              <li>Incrustar gráficos (importancias de variables, árboles, curvas ROC, etc.).</li>
-              <li>Mostrar métricas de desempeño por modelo.</li>
-              <li>Comparar diferentes configuraciones o versiones de modelos.</li>
-            </ul>
-            <div class="placeholder-box">
-              Espacio disponible para visualizaciones y tablas de resultados de tus modelos.
-            </div>
-          </div>
+          <section class="grid grid-models">
+            <!-- 1. Resumen de modelos -->
+            <article class="card">
+              <h2>Resumen de modelos</h2>
+              <p>
+                Desempeño global de los modelos de árboles de decisión/XGBoost
+                entrenados para cada peaje y sentido.
+              </p>
+              <div id="models-summary-text" class="small-text">
+                Cargando resumen de modelos...
+              </div>
+              <div class="table-wrapper">
+                <table id="models-summary-table"></table>
+              </div>
+            </article>
+
+            <!-- 2. Datos de trafico_limpio -->
+            <article class="card">
+              <h2>Datos de tráfico (trafico_limpio)</h2>
+              <p>
+                Información agregada por día y peaje que alimenta los modelos
+                predictivos (sentidos 1 y 2, total, tipo de día, TRM).
+              </p>
+              <div id="trafico-summary" class="small-text">
+                Cargando información de <code>trafico_limpio.csv</code>...
+              </div>
+              <div class="table-wrapper">
+                <table id="trafico-table"></table>
+              </div>
+            </article>
+
+            <!-- 3. Modelo por peaje seleccionado -->
+            <article class="card">
+              <h2>Detalle de modelo por peaje</h2>
+              <p>
+                Selecciona un peaje para ver las métricas del modelo y una muestra
+                de las predicciones vs valores reales.
+              </p>
+
+              <div class="peaje-select-row">
+                <label for="peaje-select">Peaje:&nbsp;</label>
+                <select id="peaje-select"></select>
+              </div>
+
+              <div id="peaje-model-summary" class="small-text">
+                Selecciona un peaje para ver su modelo.
+              </div>
+
+              <div class="table-wrapper">
+                <table id="peaje-model-table"></table>
+              </div>
+            </article>
+          </section>
         </div>
       </section>
 

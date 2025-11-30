@@ -14,7 +14,7 @@ body {
   color: #fff;
   padding: 1.5rem 1.25rem;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  text-align: center; /* centrado del título y subtítulo */
+  text-align: center;
 }
 
 .page-header h1 {
@@ -103,7 +103,7 @@ body {
   display: block;
 }
 
-/* Grid de tarjetas de gráficos */
+/* Grid de tarjetas */
 .grid {
   display: grid;
   gap: 1.5rem;
@@ -177,7 +177,63 @@ footer {
   font-size: 0.9rem;
 }
 
-/* Placeholders para modelos y mockup */
+/* Texto pequeño para resúmenes */
+.small-text {
+  font-size: 0.88rem;
+  color: #444;
+}
+
+/* Tablas dentro de tarjetas */
+.table-wrapper {
+  margin-top: 0.6rem;
+  border-radius: 0.7rem;
+  border: 1px solid #e5e7eb;
+  overflow: auto;
+  max-height: 260px;
+  background: #f9fafb;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+th,
+td {
+  padding: 0.35rem 0.55rem;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  background: #eef2f7;
+  font-weight: 600;
+}
+
+tr:nth-child(even) td {
+  background: #f9fafb;
+}
+
+/* Selector de peaje */
+.peaje-select-row {
+  margin-top: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: flex-start;
+  font-size: 0.9rem;
+}
+
+.peaje-select-row select {
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.4rem;
+  border: 1px solid #ccc;
+  font-size: 0.9rem;
+}
+
+/* Placeholders para mockup */
 .placeholder-note {
   font-size: 0.9rem;
   color: #444;
