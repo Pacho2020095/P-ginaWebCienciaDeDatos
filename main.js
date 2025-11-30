@@ -42,8 +42,8 @@ const PEAJE_MODEL_FILES = {
     "2": "resultados_peaje_tunel_la_linea_quindio_sentido_2.csv",
   },
   "Pto Triunfo": {
-    "1": "resultados_pto_triунfo_sentido_1.csv",
-    "2": "resultados_pto_triунfo_sentido_2.csv",
+    "1": "resultados_pto_triunfo_sentido_1.csv",
+    "2": "resultados_pto_triunfo_sentido_2.csv",
   },
 };
 
@@ -55,8 +55,9 @@ let modelsSummaryChart = null;
 let traficoChart = null;
 let peajeModelChart = null;
 
-// Datos crudos de trafico_limpio
+// Datos crudos
 let traficoRows = null;
+let modelsRows = null; // resumen_metricas_modelos
 
 // ========== Utilidades generales ==========
 
@@ -319,129 +320,232 @@ function setupNavigation() {
   });
 }
 
-// ========== Sección Modelos: 1) Resumen de modelos (gráfico) ==========
+// ========== Sección Modelos: 1) Resumen de modelos (selector + gráfico) ==========
+
+function computeModelsSummaryHTML(rows, mode, peaje, sentido) {
+  const peajes = new Set(rows.map((r) => r.peaje));
+  const targets = new Set(rows.map((r) => r.target));
+
+  const rmseVals = rows
+    .map((r) => parseFloat(r.rmse_test))
+    .filter((v) => !isNaN(v));
+  const smapeVals = rows
+    .map((r) => parseFloat(r.smape_test))
+    .filter((v) => !isNaN(v));
+
+  const minRMSE = rmseVals.length ? Math.min(...rmseVals) : NaN;
+  const maxRMSE = rmseVals.length ? Math.max(...rmseVals) : NaN;
+  const avgRMSE =
+    rmseVals.length > 0 ? rmseVals.reduce((a, b) => a + b, 0) / rmseVals.length : NaN;
+
+  const minSMAPE = smapeVals.length ? Math.min(...smapeVals) : NaN;
+  const maxSMAPE = smapeVals.length ? Math.max(...smapeVals) : NaN;
+
+  let bestModel = null;
+  rows.forEach((r) => {
+    const v = parseFloat(r.rmse_test);
+    if (isNaN(v)) return;
+    if (!bestModel || v < parseFloat(bestModel.rmse_test)) {
+      bestModel = r;
+    }
+  });
+
+  const scopeText =
+    mode === "general"
+      ? "en todos los peajes y targets"
+      : `para <strong>${peaje}</strong> (sentido ${sentido})`;
+
+  return `
+    <p>Se consideran <strong>${rows.length}</strong> modelos ${scopeText}, que cubren
+    <strong>${peajes.size}</strong> peajes y
+    <strong>${targets.size}</strong> targets.</p>
+    <p>
+      En el conjunto de prueba, el RMSE va aproximadamente de
+      <strong>${isNaN(minRMSE) ? "N/D" : minRMSE.toFixed(1)}</strong> a
+      <strong>${isNaN(maxRMSE) ? "N/D" : maxRMSE.toFixed(1)}</strong>,
+      con un promedio cercano a
+      <strong>${isNaN(avgRMSE) ? "N/D" : avgRMSE.toFixed(1)}</strong>.
+    </p>
+    <p>
+      El sMAPE en prueba se mueve entre
+      <strong>${isNaN(minSMAPE) ? "N/D" : minSMAPE.toFixed(2)}%</strong> y
+      <strong>${isNaN(maxSMAPE) ? "N/D" : maxSMAPE.toFixed(2)}%</strong>.
+    </p>
+    ${
+      bestModel
+        ? `<p>
+      El mejor modelo por RMSE de prueba corresponde al peaje
+      <strong>${bestModel.peaje}</strong> (${bestModel.target}),
+      con RMSE test = <strong>${parseFloat(
+        bestModel.rmse_test
+      ).toFixed(1)}</strong>.
+    </p>`
+        : ""
+    }
+  `;
+}
+
+function updateModelsChart(mode, peaje, sentido) {
+  const summaryDiv = document.getElementById("models-summary-text");
+  const canvas = document.getElementById("models-summary-chart");
+  if (!summaryDiv || !canvas || !modelsRows) return;
+
+  let rows = modelsRows;
+
+  if (mode === "peaje-sentido") {
+    const targetStr = sentido === "1" ? "sentido_1" : "sentido_2";
+    rows = modelsRows.filter(
+      (r) => r.peaje === peaje && r.target === targetStr
+    );
+  }
+
+  if (!rows.length) {
+    summaryDiv.innerHTML =
+      mode === "general"
+        ? "No se encontraron modelos en resumen_metricas_modelos.csv."
+        : `No se encontraron modelos para <strong>${peaje}</strong> en sentido <strong>${sentido}</strong>.`;
+    if (modelsSummaryChart) {
+      modelsSummaryChart.destroy();
+      modelsSummaryChart = null;
+    }
+    return;
+  }
+
+  // Texto de resumen
+  summaryDiv.innerHTML = computeModelsSummaryHTML(rows, mode, peaje, sentido);
+
+  // Preparar datos para gráfico
+  let labels, data;
+  if (mode === "general") {
+    labels = rows.map((r) => {
+      const t =
+        r.target === "sentido_1"
+          ? "S1"
+          : r.target === "sentido_2"
+          ? "S2"
+          : r.target;
+      return `${r.peaje} (${t})`;
+    });
+    data = rows.map((r) => {
+      const v = parseFloat(r.rmse_test);
+      return isNaN(v) ? null : v;
+    });
+  } else {
+    // Por peaje y sentido: barras por modelo
+    labels = rows.map((r) => r.modelo || `${r.peaje} (${r.target})`);
+    data = rows.map((r) => {
+      const v = parseFloat(r.rmse_test);
+      return isNaN(v) ? null : v;
+    });
+  }
+
+  if (modelsSummaryChart) {
+    modelsSummaryChart.destroy();
+  }
+
+  const ctx = canvas.getContext("2d");
+  modelsSummaryChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "RMSE test",
+          data,
+          borderWidth: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          ticks: {
+            maxRotation: 60,
+            minRotation: 40,
+            autoSkip: false,
+          },
+        },
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: "RMSE test",
+          },
+        },
+      },
+    },
+  });
+}
+
+function setupModelsControls() {
+  const modeSelect = document.getElementById("models-mode");
+  const peajeSelect = document.getElementById("models-peaje-select");
+  const sentidoSelect = document.getElementById("models-sentido-select");
+  const peajeRow = document.querySelector(".models-peaje-row");
+  const sentidoRow = document.querySelector(".models-sentido-row");
+
+  if (!modeSelect || !peajeSelect || !sentidoSelect || !modelsRows) return;
+
+  // Poblar peajes desde modelos
+  const peajesSet = new Set(modelsRows.map((r) => r.peaje).filter(Boolean));
+  const peajes = Array.from(peajesSet).sort();
+  peajeSelect.innerHTML = "";
+  peajes.forEach((p) => {
+    const opt = document.createElement("option");
+    opt.value = p;
+    opt.textContent = p;
+    peajeSelect.appendChild(opt);
+  });
+
+  function refreshVisibility() {
+    const mode = modeSelect.value;
+    if (mode === "peaje-sentido") {
+      if (peajeRow) peajeRow.style.display = "flex";
+      if (sentidoRow) sentidoRow.style.display = "flex";
+    } else {
+      if (peajeRow) peajeRow.style.display = "none";
+      if (sentidoRow) sentidoRow.style.display = "none";
+    }
+  }
+
+  function updateFromControls() {
+    const mode = modeSelect.value;
+    const peaje = peajeSelect.value;
+    const sentido = sentidoSelect.value;
+    updateModelsChart(mode, peaje, sentido);
+  }
+
+  modeSelect.addEventListener("change", () => {
+    refreshVisibility();
+    updateFromControls();
+  });
+  peajeSelect.addEventListener("change", updateFromControls);
+  sentidoSelect.addEventListener("change", updateFromControls);
+
+  // Estado inicial: general
+  modeSelect.value = "general";
+  refreshVisibility();
+  updateFromControls();
+}
 
 async function initModelsSummary() {
   const summaryDiv = document.getElementById("models-summary-text");
-  const canvas = document.getElementById("models-summary-chart");
-  if (!summaryDiv || !canvas) return;
+  if (!summaryDiv) return;
 
   summaryDiv.textContent = "Cargando resumen de modelos...";
 
   try {
     const { headers, rows } = await loadCSV("resumen_metricas_modelos.csv");
+    modelsRows = rows;
     if (!rows.length) {
       summaryDiv.textContent =
         "No se encontraron modelos en resumen_metricas_modelos.csv.";
       return;
     }
 
-    const peajes = new Set(rows.map((r) => r.peaje));
-    const targets = new Set(rows.map((r) => r.target));
-
-    const rmseVals = rows
-      .map((r) => parseFloat(r.rmse_test))
-      .filter((v) => !isNaN(v));
-    const smapeVals = rows
-      .map((r) => parseFloat(r.smape_test))
-      .filter((v) => !isNaN(v));
-
-    const minRMSE = rmseVals.length ? Math.min(...rmseVals) : NaN;
-    const maxRMSE = rmseVals.length ? Math.max(...rmseVals) : NaN;
-    const avgRMSE =
-      rmseVals.length > 0
-        ? rmseVals.reduce((a, b) => a + b, 0) / rmseVals.length
-        : NaN;
-
-    const minSMAPE = smapeVals.length ? Math.min(...smapeVals) : NaN;
-    const maxSMAPE = smapeVals.length ? Math.max(...smapeVals) : NaN;
-
-    let bestModel = null;
-    rows.forEach((r) => {
-      const v = parseFloat(r.rmse_test);
-      if (isNaN(v)) return;
-      if (!bestModel || v < parseFloat(bestModel.rmse_test)) {
-        bestModel = r;
-      }
-    });
-
-    summaryDiv.innerHTML = `
-      <p>Se entrenaron <strong>${rows.length}</strong> modelos para
-      <strong>${peajes.size}</strong> peajes y
-      <strong>${targets.size}</strong> targets (sentidos).</p>
-      <p>
-        En el conjunto de prueba, el RMSE va aproximadamente de
-        <strong>${isNaN(minRMSE) ? "N/D" : minRMSE.toFixed(1)}</strong> a
-        <strong>${isNaN(maxRMSE) ? "N/D" : maxRMSE.toFixed(1)}</strong>,
-        con un promedio cercano a
-        <strong>${isNaN(avgRMSE) ? "N/D" : avgRMSE.toFixed(1)}</strong>.
-      </p>
-      <p>
-        El sMAPE en prueba se mueve entre
-        <strong>${isNaN(minSMAPE) ? "N/D" : minSMAPE.toFixed(2)}%</strong> y
-        <strong>${isNaN(maxSMAPE) ? "N/D" : maxSMAPE.toFixed(2)}%</strong>.
-      </p>
-      ${
-        bestModel
-          ? `<p>
-        El mejor modelo por RMSE de prueba corresponde al peaje
-        <strong>${bestModel.peaje}</strong> (${bestModel.target}),
-        con RMSE test = <strong>${parseFloat(
-          bestModel.rmse_test
-        ).toFixed(1)}</strong>.
-      </p>`
-          : ""
-      }
-    `;
-
-    // Gráfico de barras: RMSE test por peaje/target
-    const ctx = canvas.getContext("2d");
-    const labels = rows.map((r) => {
-      const t = r.target === "sentido_1" ? "S1" : r.target === "sentido_2" ? "S2" : r.target;
-      return `${r.peaje} (${t})`;
-    });
-    const data = rows.map((r) => {
-      const v = parseFloat(r.rmse_test);
-      return isNaN(v) ? null : v;
-    });
-
-    if (modelsSummaryChart) {
-      modelsSummaryChart.destroy();
-    }
-
-    modelsSummaryChart = new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels,
-        datasets: [
-          {
-            label: "RMSE test",
-            data,
-            borderWidth: 1,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          x: {
-            ticks: {
-              maxRotation: 60,
-              minRotation: 40,
-              autoSkip: false,
-            },
-          },
-          y: {
-            beginAtZero: true,
-            title: {
-              display: true,
-              text: "RMSE test",
-            },
-          },
-        },
-      },
-    });
+    setupModelsControls();
   } catch (err) {
     console.error("Error cargando resumen_metricas_modelos.csv:", err);
     summaryDiv.textContent =
