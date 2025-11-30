@@ -25,6 +25,9 @@
       <button class="nav-button" data-target="view-mockup">
         Mock up
       </button>
+      <button class="nav-button" data-target="view-operator">
+        Interfaz del operario
+      </button>
     </nav>
 
     <!-- Contenido principal (cambia según la vista) -->
@@ -213,6 +216,38 @@
           </div>
         </div>
       </section>
+
+      <!-- Vista 4: Interfaz del operario -->
+      <section id="view-operator" class="view-section">
+        <div class="container">
+          <article class="card">
+            <h2>Interfaz del operario</h2>
+            <p>
+              Selecciona un peaje y un mes para estimar cuántos carriles deben quedar
+              habilitados en cada sentido, a partir de los modelos de tráfico entrenados.
+            </p>
+
+            <div class="selector-row">
+              <div class="peaje-select-row">
+                <label for="operator-peaje-select">Peaje:&nbsp;</label>
+                <select id="operator-peaje-select"></select>
+              </div>
+              <div class="sentido-select-row">
+                <label for="operator-month-select">Mes:&nbsp;</label>
+                <select id="operator-month-select"></select>
+              </div>
+            </div>
+
+            <div id="operator-result-text" class="small-text" style="margin-top: 0.5rem;">
+              Cargando datos de modelos para la interfaz del operario...
+            </div>
+
+            <div class="chart-wrapper">
+              <canvas id="operator-chart"></canvas>
+            </div>
+          </article>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -220,9 +255,4 @@
     Datos consolidados multi-año · Proyecto peajes UTPN
   </footer>
 
-  <!-- Librería Chart.js desde CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Tu script principal -->
-  <script src="main.js"></script>
-</body>
-</html>
+  <!-
