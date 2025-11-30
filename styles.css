@@ -210,31 +210,6 @@ footer {
   font-size: 0.9rem;
 }
 
-/* Placeholders (si los llegas a reutilizar) */
-.placeholder-note {
-  font-size: 0.9rem;
-  color: #444;
-  margin-top: 0.25rem;
-}
-
-.placeholder-list {
-  margin: 0.35rem 0 0.75rem 1.1rem;
-  font-size: 0.9rem;
-  color: #555;
-}
-
-.placeholder-box,
-.mockup-placeholder-box {
-  margin-top: 0.25rem;
-  padding: 1rem;
-  border-radius: 0.8rem;
-  border: 2px dashed #c0cad8;
-  background: #f8fafc;
-  font-size: 0.9rem;
-  color: #4b5563;
-  text-align: center;
-}
-
 /* Layout de la estación para el operario */
 .operator-layout {
   margin-top: 1rem;

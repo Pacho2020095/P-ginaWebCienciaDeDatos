@@ -27,7 +27,7 @@
       </button>
     </nav>
 
-    <!-- Contenido principal (cambia según la vista) -->
+    <!-- Contenido principal -->
     <main class="main-content">
       <!-- Vista 1: Análisis exploratorio -->
       <section id="view-eda" class="view-section active">
@@ -195,7 +195,7 @@
           <article class="card">
             <h2>Interfaz del operario</h2>
             <p>
-              Selecciona un peaje, un año y un mes para estimar cuántos carriles deben
+              Selecciona un peaje, un año, un mes y un día para estimar cuántos carriles deben
               quedar habilitados en cada sentido, a partir de los modelos de tráfico entrenados.
             </p>
 
@@ -211,6 +211,10 @@
               <div class="sentido-select-row">
                 <label for="operator-month-select">Mes:&nbsp;</label>
                 <select id="operator-month-select"></select>
+              </div>
+              <div class="sentido-select-row">
+                <label for="operator-day-select">Día:&nbsp;</label>
+                <select id="operator-day-select"></select>
               </div>
             </div>
 

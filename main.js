@@ -33,10 +33,6 @@ const MONTH_FULL = [
 // Años para el gráfico 1 (EDA)
 const YEAR_RANGE = ["2021", "2022", "2023", "2024", "2025"];
 
-// Capacidad approx. por carril (vehículos/día) para la interfaz del operario
-// AJÚSTALA según tu dimensionamiento:
-const LANE_CAPACITY = 9000;
-
 // Mapping de peaje -> { sentido -> archivo CSV }
 const PEAJE_MODEL_FILES = {
   Sachica: {
@@ -79,8 +75,8 @@ let peajeModelChart = null;
 // Datos crudos
 let traficoRows = null;
 let modelsRows = null; // resumen_metricas_modelos.csv
-let operatorData = null; // {peaje: {sentido: {year: {mesIndex: {avg, lanes}}}}}
-let operatorYears = []; // años disponibles en los modelos
+let operatorData = null; // {peaje: {dateKey: { "1": value, "2": value }}}
+let operatorYears = []; // años disponibles en los modelos (para el select)
 
 // ========== Utilidades generales ==========
 
@@ -172,7 +168,7 @@ function prepararDatosChart1(c1) {
   let defaultYear = YEAR_RANGE[0];
   for (let i = YEAR_RANGE.length - 1; i >= 0; i--) {
     const y = YEAR_RANGE[i];
-    const arr = dataByYear[y] || [];
+    const arr = (dataByYear[y] || []);
     const tieneDatos = arr.some((v) => v != null && !isNaN(v));
     if (tieneDatos) {
       defaultYear = y;
@@ -343,7 +339,7 @@ function setupNavigation() {
   });
 }
 
-// ========== Sección Modelos: 1) Resumen de modelos (selector + gráfico) ==========
+// ========== Sección Modelos: 1) Resumen de modelos ==========
 
 function computeModelsSummaryHTML(rows, mode, peaje, sentido) {
   const peajes = new Set(rows.map((r) => r.peaje));
@@ -400,8 +396,8 @@ function computeModelsSummaryHTML(rows, mode, peaje, sentido) {
       El mejor modelo por RMSE de prueba corresponde al peaje
       <strong>${bestModel.peaje}</strong> (${bestModel.target}),
       con RMSE test = <strong>${parseFloat(
-        bestModel.rmse_test
-      ).toFixed(1)}</strong>.
+      bestModel.rmse_test
+    ).toFixed(1)}</strong>.
     </p>`
         : ""
     }
@@ -576,7 +572,7 @@ async function initModelsSummary() {
   }
 }
 
-// ========== Sección Modelos: 2) trafico_limpio (gráfico con selector) ==========
+// ========== Sección Modelos: 2) trafico_limpio ==========
 
 function updateTraficoChart(mode, peaje, sentido) {
   const canvas = document.getElementById("trafico-chart");
@@ -771,7 +767,7 @@ async function initTraficoSummary() {
   }
 }
 
-// ========== Sección Modelos: 3) Modelo por peaje y sentido (gráfico) ==========
+// ========== Sección Modelos: 3) Modelo por peaje y sentido ==========
 
 async function loadPeajeModel(peajeKey, sentido) {
   const filesBySentido = PEAJE_MODEL_FILES[peajeKey] || {};
@@ -947,55 +943,64 @@ function setupPeajeSelector() {
   updatePeajeModel();
 }
 
-// ========== Interfaz del operario ==========
+// ========== Interfaz del operario (por día) ==========
 
-// Extrae índice de mes (0–11) desde una fila de modelo
-function getMonthIndexFromRow(row) {
-  // 1) Columna 'mes' si existe
-  if (row.mes) {
-    const mStr = row.mes.toString().trim().toLowerCase();
-    const num = parseInt(mStr, 10);
-    if (!isNaN(num) && num >= 1 && num <= 12) return num - 1;
+// Parsear fecha tipo "YYYY-MM-DD" o "DD/MM/YYYY" etc. -> {year, month, day}
+function parseYMD(fechaStr) {
+  if (!fechaStr) return null;
+  const s = fechaStr.toString().trim();
+  if (!s) return null;
+  const parts = s.split(/[-\/]/).map((p) => p.trim());
+  if (parts.length < 3) return null;
 
-    const idxName = MONTH_FULL.map((x) => x.toLowerCase()).indexOf(mStr);
-    if (idxName !== -1) return idxName;
+  let year, month, day;
+  if (parts[0].length === 4) {
+    // YYYY-MM-DD
+    year = parseInt(parts[0], 10);
+    month = parseInt(parts[1], 10);
+    day = parseInt(parts[2], 10);
+  } else if (parts[2].length === 4) {
+    // DD-MM-YYYY
+    day = parseInt(parts[0], 10);
+    month = parseInt(parts[1], 10);
+    year = parseInt(parts[2], 10);
+  } else {
+    return null;
   }
 
-  // 2) Intentar desde 'fecha'
-  const fecha = row.fecha || row.date || "";
-  if (fecha) {
-    const parts = fecha.split(/[-\/]/);
-    if (parts.length >= 2) {
-      const maybeMonth = parseInt(parts[1], 10);
-      if (!isNaN(maybeMonth) && maybeMonth >= 1 && maybeMonth <= 12) {
-        return maybeMonth - 1;
-      }
-    }
+  if (
+    isNaN(year) ||
+    isNaN(month) ||
+    isNaN(day) ||
+    year < 2015 ||
+    year > 2035 ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31
+  ) {
+    return null;
   }
 
-  return null;
+  return { year, month, day };
 }
 
-// Extrae año desde una fila (2015–2035)
-function getYearFromRow(row) {
-  if (row.anio || row.year) {
-    const y = parseInt(row.anio || row.year, 10);
-    if (!isNaN(y) && y >= 2015 && y <= 2035) return y;
-  }
-  const fecha = row.fecha || row.date || "";
-  if (fecha) {
-    const parts = fecha.split(/[-\/]/);
-    for (const p of parts) {
-      const y = parseInt(p, 10);
-      if (!isNaN(y) && y >= 2015 && y <= 2035) {
-        return y;
-      }
-    }
-  }
-  return null;
+function canonicalDateKey(year, month, day) {
+  const ys = String(year).padStart(4, "0");
+  const ms = String(month).padStart(2, "0");
+  const ds = String(day).padStart(2, "0");
+  return `${ys}-${ms}-${ds}`;
 }
 
-// Construye estructura agregada de tráfico promedio mensual predicho
+function computeLanesFromTraffic(val) {
+  if (val == null || isNaN(val)) return null;
+  if (val <= 2880) return 1;
+  if (val <= 5760) return 2;
+  if (val <= 8640) return 3;
+  return 4;
+}
+
+// Construye estructura de tráfico diario por peaje / fecha / sentido
 async function buildOperatorData() {
   operatorData = {};
   const yearsSet = new Set();
@@ -1003,53 +1008,57 @@ async function buildOperatorData() {
   const entries = Object.entries(PEAJE_MODEL_FILES);
 
   for (const [peajeKey, sentidosObj] of entries) {
-    operatorData[peajeKey] = {};
-    for (const [sentido, file] of Object.entries(sentidosObj)) {
+    operatorData[peajeKey] = operatorData[peajeKey] || {};
+
+    // Usar cada archivo una sola vez
+    const filesSet = new Set(Object.values(sentidosObj));
+    for (const file of filesSet) {
       try {
         const { rows } = await loadCSV(file);
         if (!rows.length) continue;
 
-        const acumPorYearMes = {}; // {yearKey: {mesIndex: {suma, n}}}
-
         rows.forEach((r) => {
-          const year = getYearFromRow(r);
-          const mIndex = getMonthIndexFromRow(r);
-          if (year === null || mIndex === null) return;
+          const fechaRaw = r.fecha || r.date;
+          const ymd = parseYMD(fechaRaw);
+          if (!ymd) return;
+
+          const { year, month, day } = ymd;
           const yearKey = String(year);
-          const yPred = parseFloat(r.y_pred);
-          if (isNaN(yPred)) return;
-
-          if (!acumPorYearMes[yearKey]) {
-            acumPorYearMes[yearKey] = {};
-          }
-          if (!acumPorYearMes[yearKey][mIndex]) {
-            acumPorYearMes[yearKey][mIndex] = { suma: 0, n: 0 };
-          }
-          acumPorYearMes[yearKey][mIndex].suma += yPred;
-          acumPorYearMes[yearKey][mIndex].n += 1;
+          const dateKey = canonicalDateKey(year, month, day);
           yearsSet.add(yearKey);
-        });
 
-        operatorData[peajeKey][sentido] = {};
+          // Determinar sentido
+          let sense = null;
+          const target = (r.target || "").toLowerCase();
+          if (target === "sentido_1") sense = "1";
+          else if (target === "sentido_2") sense = "2";
+          else {
+            const fname = file.toLowerCase();
+            if (fname.includes("sentido_1")) sense = "1";
+            else if (fname.includes("sentido_2")) sense = "2";
+          }
+          if (!sense) return;
 
-        Object.keys(acumPorYearMes).forEach((yearKey) => {
-          operatorData[peajeKey][sentido][yearKey] = {};
-          for (let m = 0; m < 12; m++) {
-            const info = acumPorYearMes[yearKey][m];
-            if (!info || info.n === 0) {
-              operatorData[peajeKey][sentido][yearKey][m] = {
-                avg: null,
-                lanes: null,
-              };
-            } else {
-              const avg = info.suma / info.n;
-              const lanes = Math.max(1, Math.ceil(avg / LANE_CAPACITY)); // al menos 1 carril
-              operatorData[peajeKey][sentido][yearKey][m] = { avg, lanes };
-            }
+          // Valor de tráfico: primero y_pred, luego y_real como respaldo
+          let val = parseFloat(r.y_pred);
+          if (isNaN(val)) {
+            val = parseFloat(r.y_real);
+          }
+          if (isNaN(val)) return;
+
+          if (!operatorData[peajeKey][dateKey]) {
+            operatorData[peajeKey][dateKey] = {};
+          }
+          // Si ya hay un valor, promediamos (por seguridad)
+          const prev = operatorData[peajeKey][dateKey][sense];
+          if (prev == null) {
+            operatorData[peajeKey][dateKey][sense] = val;
+          } else {
+            operatorData[peajeKey][dateKey][sense] = (prev + val) / 2;
           }
         });
       } catch (err) {
-        console.error("Error cargando CSV para operador:", peajeKey, sentido, file, err);
+        console.error("Error cargando CSV para operador:", peajeKey, file, err);
       }
     }
   }
@@ -1098,31 +1107,44 @@ function updateOperatorView() {
   const peajeSelect = document.getElementById("operator-peaje-select");
   const yearSelect = document.getElementById("operator-year-select");
   const monthSelect = document.getElementById("operator-month-select");
+  const daySelect = document.getElementById("operator-day-select");
   const resultDiv = document.getElementById("operator-result-text");
   const layoutDiv = document.getElementById("operator-layout");
 
-  if (!peajeSelect || !yearSelect || !monthSelect || !resultDiv || !layoutDiv || !operatorData) {
+  if (
+    !peajeSelect ||
+    !yearSelect ||
+    !monthSelect ||
+    !daySelect ||
+    !resultDiv ||
+    !layoutDiv ||
+    !operatorData
+  ) {
     return;
   }
 
   const peajeKey = peajeSelect.value;
-  const yearKey = yearSelect.value;
-  const monthIndex = parseInt(monthSelect.value, 10);
+  const year = parseInt(yearSelect.value, 10);
+  const monthIndex = parseInt(monthSelect.value, 10); // 0–11
+  const day = parseInt(daySelect.value, 10);
   const monthLabel = MONTH_FULL[monthIndex];
 
+  const dateKey = canonicalDateKey(year, monthIndex + 1, day);
+
   const peajeData = operatorData[peajeKey] || {};
-  const s1 = peajeData["1"] && peajeData["1"][yearKey] ? peajeData["1"][yearKey][monthIndex] : null;
-  const s2 = peajeData["2"] && peajeData["2"][yearKey] ? peajeData["2"][yearKey][monthIndex] : null;
+  const daily = peajeData[dateKey] || {};
 
-  const lanes1 = s1 && s1.lanes != null ? s1.lanes : null;
-  const lanes2 = s2 && s2.lanes != null ? s2.lanes : null;
+  const traffic1 = daily["1"];
+  const traffic2 = daily["2"];
 
-  // Sin datos para ambos sentidos
+  const lanes1 = computeLanesFromTraffic(traffic1);
+  const lanes2 = computeLanesFromTraffic(traffic2);
+
   if (lanes1 === null && lanes2 === null) {
     resultDiv.innerHTML = `
-      <p>No hay suficientes datos del modelo para el peaje
-      <strong>${peajeKey}</strong> en <strong>${monthLabel} ${yearKey}</strong>.</p>
-      <p>Puedes intentar con otro mes o revisar la configuración de los modelos.</p>
+      <p>No hay datos de modelo para el peaje
+      <strong>${peajeKey}</strong> el <strong>${day} de ${monthLabel} de ${year}</strong>.</p>
+      <p>Puedes probar con otra fecha.</p>
     `;
     layoutDiv.innerHTML = "";
     return;
@@ -1131,36 +1153,39 @@ function updateOperatorView() {
   const parts = [];
   if (lanes1 !== null) {
     parts.push(
-      `Sentido <strong>1</strong>: habilitar <strong>${lanes1}</strong> carril(es) (estimado a partir del tráfico promedio del mes).`
+      `Sentido <strong>1</strong>: tráfico estimado ≈ <strong>${Math.round(
+        traffic1
+      ).toLocaleString("es-CO")}</strong> veh/día → habilitar <strong>${lanes1}</strong> carril(es).`
     );
   } else {
     parts.push(
-      `Sentido <strong>1</strong>: sin modelo/estimación disponible para este mes.`
+      `Sentido <strong>1</strong>: sin datos para esta fecha.`
     );
   }
+
   if (lanes2 !== null) {
     parts.push(
-      `Sentido <strong>2</strong>: habilitar <strong>${lanes2}</strong> carril(es) (estimado a partir del tráfico promedio del mes).`
+      `Sentido <strong>2</strong>: tráfico estimado ≈ <strong>${Math.round(
+        traffic2
+      ).toLocaleString("es-CO")}</strong> veh/día → habilitar <strong>${lanes2}</strong> carril(es).`
     );
   } else {
     parts.push(
-      `Sentido <strong>2</strong>: sin modelo/estimación disponible para este mes.`
+      `Sentido <strong>2</strong>: sin datos para esta fecha.`
     );
   }
 
   resultDiv.innerHTML = `
     <p><strong>Peaje:</strong> ${peajeKey}</p>
-    <p><strong>Periodo de operación:</strong> ${monthLabel} ${yearKey}</p>
+    <p><strong>Fecha de operación:</strong> ${day} de ${monthLabel} de ${year}</p>
     <p>${parts.join("<br/>")}</p>
     <p style="font-size:0.8rem; color:#666;">
-      Nota: el cálculo de carriles se basa en el tráfico promedio mensual predicho
-      por los modelos y una capacidad de referencia de aproximadamente
-      ${LANE_CAPACITY.toLocaleString("es-CO")} vehículos/día por carril.
-      Puedes ajustar este parámetro en el código si es necesario.
+      Reglas de dimensionamiento por sentido (vehículos/día):<br/>
+      ≤ 2.880 → 1 carril · 2.880–5.760 → 2 carriles · 5.760–8.640 → 3 carriles · &gt; 8.640 → 4 carriles.
     </p>
   `;
 
-  // Layout visual de estación y carriles (tipo diagrama)
+  // Layout visual de estación y carriles
   layoutDiv.innerHTML = buildOperatorLayoutHTML(peajeKey, lanes1 || 0, lanes2 || 0);
 }
 
@@ -1168,13 +1193,14 @@ async function initOperatorInterface() {
   const peajeSelect = document.getElementById("operator-peaje-select");
   const yearSelect = document.getElementById("operator-year-select");
   const monthSelect = document.getElementById("operator-month-select");
+  const daySelect = document.getElementById("operator-day-select");
   const resultDiv = document.getElementById("operator-result-text");
-  if (!peajeSelect || !yearSelect || !monthSelect || !resultDiv) return;
+  if (!peajeSelect || !yearSelect || !monthSelect || !daySelect || !resultDiv) return;
 
   resultDiv.textContent =
     "Cargando datos de modelos para la interfaz del operario...";
 
-  // Construir datos agregados por peaje/sentido/año/mes
+  // Construir datos agregados por peaje / fecha / sentido
   await buildOperatorData();
 
   if (!operatorYears.length) {
@@ -1201,7 +1227,7 @@ async function initOperatorInterface() {
     yearSelect.appendChild(opt);
   });
 
-  // Poblar select de meses
+  // Poblar select de meses (0–11)
   monthSelect.innerHTML = "";
   MONTH_FULL.forEach((m, idx) => {
     const opt = document.createElement("option");
@@ -1210,17 +1236,28 @@ async function initOperatorInterface() {
     monthSelect.appendChild(opt);
   });
 
+  // Poblar select de días (1–31)
+  daySelect.innerHTML = "";
+  for (let d = 1; d <= 31; d++) {
+    const opt = document.createElement("option");
+    opt.value = String(d);
+    opt.textContent = String(d);
+    daySelect.appendChild(opt);
+  }
+
   // Listeners
   peajeSelect.addEventListener("change", updateOperatorView);
   yearSelect.addEventListener("change", updateOperatorView);
   monthSelect.addEventListener("change", updateOperatorView);
+  daySelect.addEventListener("change", updateOperatorView);
 
-  // Estado inicial: primer peaje, último año disponible y Enero
+  // Estado inicial: primer peaje, último año, enero, día 1
   if (Object.keys(PEAJE_MODEL_FILES).length > 0) {
     peajeSelect.value = Object.keys(PEAJE_MODEL_FILES)[0];
   }
   yearSelect.value = operatorYears[operatorYears.length - 1];
   monthSelect.value = "0";
+  daySelect.value = "1";
 
   updateOperatorView();
 }
@@ -1239,6 +1276,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   await initTraficoSummary();
   setupPeajeSelector();
 
-  // Interfaz del operario
+  // Interfaz del operario (por día)
   await initOperatorInterface();
 });
