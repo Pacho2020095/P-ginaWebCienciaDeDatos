@@ -75,7 +75,6 @@ let chart1DataByYear = null;
 let modelsSummaryChart = null;
 let traficoChart = null;
 let peajeModelChart = null;
-let operatorChart = null;
 
 // Datos crudos
 let traficoRows = null;
@@ -1075,7 +1074,7 @@ function buildOperatorLayoutHTML(peajeKey, lanes1, lanes2) {
   `;
 
   for (let i = 0; i < total; i++) {
-    const laneName = "Carril " + laneLetters[i] || `Carril ${i + 1}`;
+    const laneName = "Carril " + (laneLetters[i] || String(i + 1));
     const isSent1 = i < totalLanes1; // primeros lanes -> sentido 1
     const arrowTop = isSent1 ? "" : `<div class="operator-arrow up"></div>`;
     const arrowBottom = isSent1 ? `<div class="operator-arrow down"></div>` : "";
@@ -1101,9 +1100,8 @@ function updateOperatorView() {
   const monthSelect = document.getElementById("operator-month-select");
   const resultDiv = document.getElementById("operator-result-text");
   const layoutDiv = document.getElementById("operator-layout");
-  const canvas = document.getElementById("operator-chart");
 
-  if (!peajeSelect || !yearSelect || !monthSelect || !resultDiv || !layoutDiv || !canvas || !operatorData) {
+  if (!peajeSelect || !yearSelect || !monthSelect || !resultDiv || !layoutDiv || !operatorData) {
     return;
   }
 
@@ -1127,10 +1125,6 @@ function updateOperatorView() {
       <p>Puedes intentar con otro mes o revisar la configuración de los modelos.</p>
     `;
     layoutDiv.innerHTML = "";
-    if (operatorChart) {
-      operatorChart.destroy();
-      operatorChart = null;
-    }
     return;
   }
 
@@ -1166,56 +1160,8 @@ function updateOperatorView() {
     </p>
   `;
 
-  // Layout visual de estación y carriles
+  // Layout visual de estación y carriles (tipo diagrama)
   layoutDiv.innerHTML = buildOperatorLayoutHTML(peajeKey, lanes1 || 0, lanes2 || 0);
-
-  // Gráfico de barras: carriles por sentido
-  if (operatorChart) {
-    operatorChart.destroy();
-  }
-
-  const ctx = canvas.getContext("2d");
-  const labels = ["Sentido 1", "Sentido 2"];
-  const data = [
-    lanes1 !== null ? lanes1 : 0,
-    lanes2 !== null ? lanes2 : 0,
-  ];
-
-  operatorChart = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [
-        {
-          label: "Carriles recomendados",
-          data,
-          borderWidth: 1,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        x: {
-          title: {
-            display: true,
-            text: "Sentido",
-          },
-        },
-        y: {
-          beginAtZero: true,
-          title: {
-            display: true,
-            text: "Número de carriles",
-          },
-          ticks: {
-            stepSize: 1,
-          },
-        },
-      },
-    },
-  });
 }
 
 async function initOperatorInterface() {

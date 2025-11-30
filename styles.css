@@ -210,7 +210,7 @@ footer {
   font-size: 0.9rem;
 }
 
-/* Placeholders para mockup */
+/* Placeholders (si los llegas a reutilizar) */
 .placeholder-note {
   font-size: 0.9rem;
   color: #444;
@@ -233,14 +233,6 @@ footer {
   font-size: 0.9rem;
   color: #4b5563;
   text-align: center;
-}
-
-/* Área de mockup un poco más alta */
-.mockup-area .mockup-placeholder-box {
-  min-height: 260px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 /* Layout de la estación para el operario */
