@@ -328,6 +328,35 @@ footer {
   flex-shrink: 0;
 }
 
+/* Tabla de costos */
+.table-wrapper {
+  margin-top: 0.5rem;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.cost-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.cost-table thead tr {
+  background-color: #f3f4f6;
+}
+
+.cost-table th,
+.cost-table td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+
+.cost-table th:first-child,
+.cost-table td:first-child {
+  white-space: nowrap;
+}
+
 /* Responsivo básico */
 @media (max-width: 768px) {
   .layout {
@@ -337,7 +366,7 @@ footer {
   .sidebar {
     width: 100%;
     flex-direction: row;
-    align-items:center;
+    align-items: center;
     flex-wrap: wrap;
   }
 
@@ -349,4 +378,3 @@ footer {
     flex: 1 1 auto;
   }
 }
-

@@ -11,6 +11,7 @@ const MONTH_LABELS = [
   "Sep",
   "Oct",
   "Nov",
+  "Dic",
 ];
 
 // Meses completos (para selects del operario)
@@ -66,6 +67,18 @@ const PEAJE_MODEL_FILES = {
   },
 };
 
+// Datos estáticos de costos promedio (para tabla y fallback en gráficos)
+const STATIC_COST_DATA = [
+  { station: "PTO. TRIUNFO", cost: 81664906 },
+  { station: "SACHICA", cost: 61294159 },
+  { station: "CASABLANCA", cost: 72967956 },
+  { station: "TUNEL DE LA LÍNEA - QUINDIO", cost: 61499239 },
+  { station: "CERRITOS II", cost: 60477325 },
+  { station: "TUNEL DE LA LÍNEA - TOLIMA", cost: 60603212 },
+  { station: "BICENTENARIO", cost: 61844399 },
+  { station: "LA PARADA", cost: 62700053 },
+];
+
 let chart1Instance = null;
 let chart1DataByYear = null;
 
@@ -73,6 +86,10 @@ let chart1DataByYear = null;
 let modelsSummaryChart = null;
 let traficoChart = null;
 let peajeModelChart = null;
+
+// Gráficos y datos de generación de valor
+let valueBarChart = null;
+let valuePieChart = null;
 
 // Datos crudos
 let traficoRows = null;
@@ -102,18 +119,24 @@ async function cargarResumen() {
   }
 }
 
-// Parseo simple de CSV (asume que no hay comas dentro de los campos)
+// Parseo de CSV con detección automática de separador (coma o punto y coma)
 function parseCSV(text) {
   const lines = text.trim().split(/\r?\n/);
   if (!lines.length) {
     return { headers: [], rows: [] };
   }
-  const headers = lines[0].split(",").map((h) => h.trim());
+
+  const firstLine = lines[0];
+  const countComma = (firstLine.match(/,/g) || []).length;
+  const countSemi = (firstLine.match(/;/g) || []).length;
+  const sep = countSemi > countComma ? ";" : ",";
+
+  const headers = firstLine.split(sep).map((h) => h.trim());
   const rows = lines
     .slice(1)
     .filter((line) => line.trim().length > 0)
     .map((line) => {
-      const values = line.split(",");
+      const values = line.split(sep);
       const obj = {};
       headers.forEach((h, idx) => {
         obj[h] = values[idx] !== undefined ? values[idx].trim() : "";
@@ -132,6 +155,22 @@ async function loadCSV(path) {
   }
   const text = await resp.text();
   return parseCSV(text);
+}
+
+// Normalizar encabezados (para buscar columnas)
+function normalizeHeader(h) {
+  return (h || "")
+    .toString()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[^\w]/g, "");
+}
+
+// Parsear moneda / número con formato colombiano
+function parseCurrency(str) {
+  if (!str) return NaN;
+  const digits = str.toString().replace(/\D/g, "");
+  return digits ? Number(digits) : NaN;
 }
 
 // ========== Gráfico 1 (EDA): preparar datos por año ==========
@@ -1013,7 +1052,7 @@ async function buildOperatorData() {
   for (const [peajeKey, sentidosObj] of entries) {
     operatorData[peajeKey] = operatorData[peajeKey] || {};
 
-    // Ahora recorremos explícitamente cada sentido y su archivo
+    // Recorremos explícitamente cada sentido y su archivo
     for (const [senseKey, file] of Object.entries(sentidosObj)) {
       try {
         const { rows } = await loadCSV(file);
@@ -1060,13 +1099,11 @@ async function buildOperatorData() {
               }
             }
 
-            // Si no hubiera esa columna, como respaldo podríamos usar y_pred,
-            // pero LO MARCAMOS como modelo sólo si también está en la zona de modelo.
+            // Si no hubiera esa columna, como respaldo podríamos usar y_pred
             if (value === null || value === undefined) {
               const yp = parseFloat(r.y_pred);
               if (!isNaN(yp)) {
                 value = yp;
-                // fecha < MODEL_ZONE_START: considerar como derivado pero sin bombillo
                 fromModel = false;
               }
             }
@@ -1304,6 +1341,123 @@ async function initOperatorInterface() {
   updateOperatorView();
 }
 
+// ========== Sección "Generación de valor" ==========
+
+async function initValueSection() {
+  const barCanvas = document.getElementById("value-cost-bar");
+  const pieCanvas = document.getElementById("value-cost-pie");
+  if (!barCanvas || !pieCanvas) return;
+
+  let labels = [];
+  let data = [];
+
+  // Intentar cargar desde CSV
+  try {
+    const { headers, rows } = await loadCSV("Costos por carril 01.csv");
+
+    if (rows && rows.length) {
+      // Buscar columnas de estación y costo
+      let stationCol = null;
+      let costCol = null;
+
+      headers.forEach((h) => {
+        const nh = normalizeHeader(h);
+        if (!stationCol && (nh === "estación" || nh === "estacion")) {
+          stationCol = h;
+        }
+        if (
+          !costCol &&
+          nh.includes("costo") &&
+          nh.includes("carril")
+        ) {
+          costCol = h;
+        }
+      });
+
+      // Si encontramos ambas columnas, usamos el CSV
+      if (stationCol && costCol) {
+        rows.forEach((r) => {
+          const st = (r[stationCol] || "").trim();
+          const cStr = r[costCol];
+          const val = parseCurrency(cStr);
+          if (st && !isNaN(val)) {
+            labels.push(st);
+            data.push(val);
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Error cargando 'Costos por carril 01.csv':", err);
+  }
+
+  // Si algo falla o sale vacío, usamos el fallback estático
+  if (!labels.length || !data.length) {
+    labels = STATIC_COST_DATA.map((d) => d.station);
+    data = STATIC_COST_DATA.map((d) => d.cost);
+  }
+
+  // Gráfico de barras
+  if (valueBarChart) {
+    valueBarChart.destroy();
+  }
+  const ctxBar = barCanvas.getContext("2d");
+  valueBarChart = new Chart(ctxBar, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Costo promedio por carril (COP)",
+          data,
+          borderWidth: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: "Estación",
+          },
+        },
+        y: {
+          beginAtZero: false,
+          title: {
+            display: true,
+            text: "COP",
+          },
+        },
+      },
+    },
+  });
+
+  // Gráfico de pie (participación)
+  if (valuePieChart) {
+    valuePieChart.destroy();
+  }
+  const ctxPie = pieCanvas.getContext("2d");
+  valuePieChart = new Chart(ctxPie, {
+    type: "pie",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Participación en costo promedio por carril",
+          data,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+    },
+  });
+}
+
 // ========== Init global ==========
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -1317,6 +1471,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   await initModelsSummary();
   await initTraficoSummary();
   setupPeajeSelector();
+
+  // Sección de generación de valor
+  await initValueSection();
 
   // Interfaz del operario (por día)
   await initOperatorInterface();
