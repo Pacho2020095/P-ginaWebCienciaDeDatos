@@ -55,7 +55,7 @@ const PEAJE_MODEL_FILES = {
     "2": "resultados_cerritos_ii_sentido_2.csv",
   },
   "La Parada": {
-    "2": "resultados_la_parada_sentido_2.csv", // solo sentido 2 disponible
+    "2": "resultados_la_parada_sentido_2.csv",
   },
   "Tunel de la Linea": {
     "1": "resultados_peaje_tunel_la_linea_tolima_sentido_1.csv",
@@ -67,7 +67,7 @@ const PEAJE_MODEL_FILES = {
   },
 };
 
-// Datos estáticos de costos promedio (para tabla y fallback en gráficos)
+// Datos estáticos de costos promedio (fallback)
 const STATIC_COST_DATA = [
   { station: "PTO. TRIUNFO", cost: 81664906 },
   { station: "SACHICA", cost: 61294159 },
@@ -87,16 +87,17 @@ let modelsSummaryChart = null;
 let traficoChart = null;
 let peajeModelChart = null;
 
-// Gráficos y datos de generación de valor
-let valueBarChart = null;
-let valuePieChart = null;
+// Generación de valor
+let valueCostChart = null;
+let valueSavingsChart = null;
+let valueData = null;
 
 // Datos crudos
 let traficoRows = null;
-let modelsRows = null; // resumen_metricas_modelos.csv
+let modelsRows = null;
 // {peaje: {dateKey: { s1: {traffic,fromModel}, s2: {traffic,fromModel} }}}
 let operatorData = null;
-let operatorYears = []; // años disponibles en los modelos (para el select)
+let operatorYears = [];
 
 // ========== Utilidades generales ==========
 
@@ -119,7 +120,7 @@ async function cargarResumen() {
   }
 }
 
-// Parseo de CSV con detección automática de separador (coma o punto y coma)
+// Parseo de CSV (coma o punto y coma)
 function parseCSV(text) {
   const lines = text.trim().split(/\r?\n/);
   if (!lines.length) {
@@ -147,7 +148,7 @@ function parseCSV(text) {
   return { headers, rows };
 }
 
-// Carga un CSV como texto y lo parsea
+// Cargar CSV desde fetch
 async function loadCSV(path) {
   const resp = await fetch(path);
   if (!resp.ok) {
@@ -181,12 +182,11 @@ function prepararDatosChart1(c1) {
   const values = c1.data || [];
 
   labels.forEach((lab, idx) => {
-    // lab ej: "Ene 2021"
     const partes = lab.split(" ");
     if (partes.length !== 2) return;
 
-    const mesStr = partes[0]; // "Ene"
-    const anioStr = partes[1]; // "2021"
+    const mesStr = partes[0];
+    const anioStr = partes[1];
     const monthIndex = MONTH_LABELS.indexOf(mesStr);
     if (monthIndex === -1) return;
 
@@ -199,14 +199,12 @@ function prepararDatosChart1(c1) {
     dataByYear[anioStr][monthIndex] = isNaN(numVal) ? null : numVal;
   });
 
-  // Garantizar los años 2021–2025 aunque no tengan datos
   YEAR_RANGE.forEach((y) => {
     if (!dataByYear[y]) {
       dataByYear[y] = new Array(12).fill(null);
     }
   });
 
-  // Año por defecto: el último de YEAR_RANGE que tenga al menos un dato
   let defaultYear = YEAR_RANGE[0];
   for (let i = YEAR_RANGE.length - 1; i >= 0; i--) {
     const y = YEAR_RANGE[i];
@@ -231,7 +229,7 @@ function prepararDatosChart1(c1) {
 function crearGraficos(resumen) {
   if (!resumen) return;
 
-  // ---------- Gráfico 1: línea con selector de año ----------
+  // Gráfico 1
   if (resumen.chart1) {
     const c1 = resumen.chart1;
     const config1 = prepararDatosChart1(c1);
@@ -240,7 +238,6 @@ function crearGraficos(resumen) {
     const ctx1 = document.getElementById("chart1").getContext("2d");
     const yearSelect = document.getElementById("yearSelect");
 
-    // Llenar el <select> con los años
     yearSelect.innerHTML = "";
     config1.years.forEach((y) => {
       const opt = document.createElement("option");
@@ -252,7 +249,6 @@ function crearGraficos(resumen) {
       yearSelect.appendChild(opt);
     });
 
-    // Crear el gráfico inicial con el año por defecto
     chart1Instance = new Chart(ctx1, {
       type: "line",
       data: {
@@ -287,7 +283,6 @@ function crearGraficos(resumen) {
       },
     });
 
-    // Cambiar el año cuando se selecciona otro
     yearSelect.addEventListener("change", (e) => {
       const year = e.target.value;
       if (!chart1Instance || !chart1DataByYear[year]) return;
@@ -298,7 +293,7 @@ function crearGraficos(resumen) {
     });
   }
 
-  // ---------- Gráfico 2: barras ----------
+  // Gráfico 2
   if (resumen.chart2) {
     const c2 = resumen.chart2;
     const ctx2 = document.getElementById("chart2").getContext("2d");
@@ -336,7 +331,7 @@ function crearGraficos(resumen) {
     });
   }
 
-  // ---------- Gráfico 3: pie ----------
+  // Gráfico 3
   if (resumen.chart3) {
     const c3 = resumen.chart3;
     const ctx3 = document.getElementById("chart3").getContext("2d");
@@ -369,11 +364,9 @@ function setupNavigation() {
     btn.addEventListener("click", () => {
       const targetId = btn.dataset.target;
 
-      // Actualizar botón activo
       buttons.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
 
-      // Mostrar solo la vista seleccionada
       views.forEach((view) => {
         view.classList.toggle("active", view.id === targetId);
       });
@@ -381,7 +374,7 @@ function setupNavigation() {
   });
 }
 
-// ========== Sección Modelos: 1) Resumen de modelos ==========
+// ========== Sección Modelos: Resumen de modelos ==========
 
 function computeModelsSummaryHTML(rows, mode, peaje, sentido) {
   const peajes = new Set(rows.map((r) => r.peaje));
@@ -472,10 +465,8 @@ function updateModelsChart(mode, peaje, sentido) {
     return;
   }
 
-  // Texto de resumen
   summaryDiv.innerHTML = computeModelsSummaryHTML(rows, mode, peaje, sentido);
 
-  // Preparar datos para gráfico
   let labels, data;
   if (mode === "general") {
     labels = rows.map((r) => {
@@ -492,7 +483,6 @@ function updateModelsChart(mode, peaje, sentido) {
       return isNaN(v) ? null : v;
     });
   } else {
-    // Por peaje y sentido: barras por modelo
     labels = rows.map((r) => r.modelo || `${r.peaje} (${r.target})`);
     data = rows.map((r) => {
       const v = parseFloat(r.rmse_test);
@@ -549,7 +539,6 @@ function setupModelsControls() {
 
   if (!modeSelect || !peajeSelect || !sentidoSelect || !modelsRows) return;
 
-  // Poblar peajes desde modelos
   const peajesSet = new Set(modelsRows.map((r) => r.peaje).filter(Boolean));
   const peajes = Array.from(peajesSet).sort();
   peajeSelect.innerHTML = "";
@@ -585,7 +574,6 @@ function setupModelsControls() {
   peajeSelect.addEventListener("change", updateFromControls);
   sentidoSelect.addEventListener("change", updateFromControls);
 
-  // Estado inicial: general
   modeSelect.value = "general";
   refreshVisibility();
   updateFromControls();
@@ -614,29 +602,26 @@ async function initModelsSummary() {
   }
 }
 
-// ========== Sección Modelos: 2) trafico_limpio ==========
+// ========== Sección Modelos: trafico_limpio ==========
 
 function updateTraficoChart(mode, peaje, sentido) {
   const canvas = document.getElementById("trafico-chart");
   if (!canvas || !traficoRows) return;
 
   const ctx = canvas.getContext("2d");
-
   const grupos = {};
+
   traficoRows.forEach((r) => {
     const tipo = r.tipo_dia || "desconocido";
 
-    // Filtrado por peaje en modo peaje-sentido
     if (mode === "peaje-sentido") {
       if (!peaje || r.peaje !== peaje) return;
     }
 
     let val;
     if (mode === "general") {
-      // componente general: promedio de la columna "total"
       val = parseFloat(r.total);
     } else {
-      // por peaje y sentido: usar sentido_1 o sentido_2
       if (sentido === "1") {
         val = parseFloat(r.sentido_1);
       } else if (sentido === "2") {
@@ -719,7 +704,6 @@ function setupTraficoControls() {
 
   if (!modeSelect || !peajeSelect || !sentidoSelect || !traficoRows) return;
 
-  // Poblar peajes desde el dataset
   const peajesSet = new Set();
   traficoRows.forEach((r) => {
     if (r.peaje) peajesSet.add(r.peaje);
@@ -758,7 +742,6 @@ function setupTraficoControls() {
   peajeSelect.addEventListener("change", updateFromControls);
   sentidoSelect.addEventListener("change", updateFromControls);
 
-  // Estado inicial: vista general
   modeSelect.value = "general";
   refreshVisibility();
   updateFromControls();
@@ -809,7 +792,7 @@ async function initTraficoSummary() {
   }
 }
 
-// ========== Sección Modelos: 3) Modelo por peaje y sentido ==========
+// ========== Sección Modelos: Modelo por peaje/sentido ==========
 
 async function loadPeajeModel(peajeKey, sentido) {
   const filesBySentido = PEAJE_MODEL_FILES[peajeKey] || {};
@@ -858,7 +841,6 @@ async function loadPeajeModel(peajeKey, sentido) {
       return isNaN(v) ? "N/D" : v.toFixed(2);
     }
 
-    // Filtrar filas de test y ordenarlas por fecha
     const testRows = rows.filter(
       (r) => (r.set || "").toLowerCase() === "test"
     );
@@ -868,8 +850,7 @@ async function loadPeajeModel(peajeKey, sentido) {
       return fa.localeCompare(fb);
     });
 
-    const lastRows = testRows.slice(-30); // últimas 30 observaciones de test
-
+    const lastRows = testRows.slice(-30);
     const labels = lastRows.map((r) => r.fecha || "");
     const yReal = lastRows.map((r) => {
       const v = parseFloat(r.y_real);
@@ -958,7 +939,6 @@ function setupPeajeSelector() {
   const sentidoSelect = document.getElementById("sentido-select");
   if (!peajeSelect || !sentidoSelect) return;
 
-  // Llenar el select con las opciones de peajes
   peajeSelect.innerHTML = "";
   Object.keys(PEAJE_MODEL_FILES).forEach((peaje) => {
     const opt = document.createElement("option");
@@ -976,7 +956,6 @@ function setupPeajeSelector() {
   peajeSelect.addEventListener("change", updatePeajeModel);
   sentidoSelect.addEventListener("change", updatePeajeModel);
 
-  // Valor inicial: primer peaje y sentido 1
   const firstKey = Object.keys(PEAJE_MODEL_FILES)[0];
   if (firstKey) {
     peajeSelect.value = firstKey;
@@ -985,9 +964,8 @@ function setupPeajeSelector() {
   updatePeajeModel();
 }
 
-// ========== Interfaz del operario (por día) ==========
+// ========== Interfaz del operario ==========
 
-// Parsear fecha tipo "YYYY-MM-DD" o "DD/MM/YYYY" -> {year, month, day}
 function parseYMD(fechaStr) {
   if (!fechaStr) return null;
   const s = fechaStr.toString().trim();
@@ -997,12 +975,10 @@ function parseYMD(fechaStr) {
 
   let year, month, day;
   if (parts[0].length === 4) {
-    // YYYY-MM-DD
     year = parseInt(parts[0], 10);
     month = parseInt(parts[1], 10);
     day = parseInt(parts[2], 10);
   } else if (parts[2].length === 4) {
-    // DD-MM-YYYY
     day = parseInt(parts[0], 10);
     month = parseInt(parts[1], 10);
     year = parseInt(parts[2], 10);
@@ -1042,7 +1018,6 @@ function computeLanesFromTraffic(val) {
   return 4;
 }
 
-// Construye estructura de tráfico diario por peaje / fecha / sentido
 async function buildOperatorData() {
   operatorData = {};
   const yearsSet = new Set();
@@ -1052,7 +1027,6 @@ async function buildOperatorData() {
   for (const [peajeKey, sentidosObj] of entries) {
     operatorData[peajeKey] = operatorData[peajeKey] || {};
 
-    // Recorremos explícitamente cada sentido y su archivo
     for (const [senseKey, file] of Object.entries(sentidosObj)) {
       try {
         const { rows } = await loadCSV(file);
@@ -1074,16 +1048,13 @@ async function buildOperatorData() {
           let fromModel = false;
 
           if (isModelZone) {
-            // Desde 16/09/2025 en adelante: usamos y_pred del archivo
             const yp = parseFloat(r.y_pred);
             if (!isNaN(yp)) {
               value = yp;
               fromModel = true;
             }
           } else {
-            // Antes de esa fecha: intentamos leer sentido_1/sentido_2 según el archivo
-            const colName =
-              senseKey === "1" ? "sentido_1" : "sentido_2";
+            const colName = senseKey === "1" ? "sentido_1" : "sentido_2";
             const colUpper = colName.toUpperCase();
 
             let raw = r[colName];
@@ -1095,11 +1066,10 @@ async function buildOperatorData() {
               const n = parseFloat(raw);
               if (!isNaN(n)) {
                 value = n;
-                fromModel = false; // datos históricos / desagregados
+                fromModel = false;
               }
             }
 
-            // Si no hubiera esa columna, como respaldo podríamos usar y_pred
             if (value === null || value === undefined) {
               const yp = parseFloat(r.y_pred);
               if (!isNaN(yp)) {
@@ -1120,7 +1090,6 @@ async function buildOperatorData() {
           if (!slot[key]) {
             slot[key] = { traffic: value, fromModel };
           } else {
-            // Si hay varios registros para la misma fecha/sentido, promediamos
             slot[key].traffic = (slot[key].traffic + value) / 2;
             slot[key].fromModel = slot[key].fromModel || fromModel;
           }
@@ -1134,7 +1103,6 @@ async function buildOperatorData() {
   operatorYears = Array.from(yearsSet).sort((a, b) => Number(a) - Number(b));
 }
 
-// Genera HTML del layout de estación + carriles
 function buildOperatorLayoutHTML(peajeKey, lanes1, lanes2) {
   const totalLanes1 = lanes1 || 0;
   const totalLanes2 = lanes2 || 0;
@@ -1152,7 +1120,7 @@ function buildOperatorLayoutHTML(peajeKey, lanes1, lanes2) {
 
   for (let i = 0; i < total; i++) {
     const laneName = "Carril " + (laneLetters[i] || String(i + 1));
-    const isSent1 = i < totalLanes1; // primeros lanes -> sentido 1
+    const isSent1 = i < totalLanes1;
     const arrowTop = isSent1 ? "" : `<div class="operator-arrow up"></div>`;
     const arrowBottom = isSent1 ? `<div class="operator-arrow down"></div>` : "";
     const label = isSent1 ? "Sentido 1" : "Sentido 2";
@@ -1193,12 +1161,11 @@ function updateOperatorView() {
 
   const peajeKey = peajeSelect.value;
   const year = parseInt(yearSelect.value, 10);
-  const monthIndex = parseInt(monthSelect.value, 10); // 0–11
+  const monthIndex = parseInt(monthSelect.value, 10);
   const day = parseInt(daySelect.value, 10);
   const monthLabel = MONTH_FULL[monthIndex];
 
   const dateKey = canonicalDateKey(year, monthIndex + 1, day);
-
   const peajeData = operatorData[peajeKey] || {};
   const daily = peajeData[dateKey] || {};
 
@@ -1264,7 +1231,6 @@ function updateOperatorView() {
     }
   `;
 
-  // Layout visual de estación y carriles
   layoutDiv.innerHTML = buildOperatorLayoutHTML(peajeKey, lanes1 || 0, lanes2 || 0);
 }
 
@@ -1279,7 +1245,6 @@ async function initOperatorInterface() {
   resultDiv.textContent =
     "Cargando datos de modelos para la interfaz del operario...";
 
-  // Construir datos agregados por peaje / fecha / sentido
   await buildOperatorData();
 
   if (!operatorYears.length) {
@@ -1288,7 +1253,6 @@ async function initOperatorInterface() {
     return;
   }
 
-  // Poblar select de peajes
   peajeSelect.innerHTML = "";
   Object.keys(PEAJE_MODEL_FILES).forEach((peaje) => {
     const opt = document.createElement("option");
@@ -1297,7 +1261,6 @@ async function initOperatorInterface() {
     peajeSelect.appendChild(opt);
   });
 
-  // Poblar select de años
   yearSelect.innerHTML = "";
   operatorYears.forEach((y) => {
     const opt = document.createElement("option");
@@ -1306,7 +1269,6 @@ async function initOperatorInterface() {
     yearSelect.appendChild(opt);
   });
 
-  // Poblar select de meses (0–11)
   monthSelect.innerHTML = "";
   MONTH_FULL.forEach((m, idx) => {
     const opt = document.createElement("option");
@@ -1315,7 +1277,6 @@ async function initOperatorInterface() {
     monthSelect.appendChild(opt);
   });
 
-  // Poblar select de días (1–31)
   daySelect.innerHTML = "";
   for (let d = 1; d <= 31; d++) {
     const opt = document.createElement("option");
@@ -1324,13 +1285,11 @@ async function initOperatorInterface() {
     daySelect.appendChild(opt);
   }
 
-  // Listeners
   peajeSelect.addEventListener("change", updateOperatorView);
   yearSelect.addEventListener("change", updateOperatorView);
   monthSelect.addEventListener("change", updateOperatorView);
   daySelect.addEventListener("change", updateOperatorView);
 
-  // Estado inicial: primer peaje, último año, enero, día 1
   if (Object.keys(PEAJE_MODEL_FILES).length > 0) {
     peajeSelect.value = Object.keys(PEAJE_MODEL_FILES)[0];
   }
@@ -1345,117 +1304,275 @@ async function initOperatorInterface() {
 
 async function initValueSection() {
   const barCanvas = document.getElementById("value-cost-bar");
-  const pieCanvas = document.getElementById("value-cost-pie");
-  if (!barCanvas || !pieCanvas) return;
+  const savingsCanvas = document.getElementById("value-savings-bar");
+  const costSummaryDiv = document.getElementById("value-cost-summary");
+  const savingsSummaryDiv = document.getElementById("value-savings-summary");
+  const modeSelect = document.getElementById("value-mode");
+  const stationSelect = document.getElementById("value-station-select");
+  const stationRow = document.querySelector(".value-station-row");
 
-  let labels = [];
-  let data = [];
+  if (!barCanvas || !savingsCanvas || !modeSelect || !stationSelect) return;
 
-  // Intentar cargar desde CSV
+  costSummaryDiv.textContent = "Cargando costos promedio por carril...";
+  savingsSummaryDiv.textContent = "Cargando ahorros estimados...";
+
+  valueData = [];
+
   try {
     const { headers, rows } = await loadCSV("Costos por carril 01.csv");
 
     if (rows && rows.length) {
-      // Buscar columnas de estación y costo
       let stationCol = null;
-      let costCol = null;
+      let costPerLaneCol = null;
+      let totalLanesCol = null;
+      let diffBaseCol = null;
+      let diffX2Col = null;
+      let diffX3Col = null;
+      let maxInactiveCol = null;
 
       headers.forEach((h) => {
         const nh = normalizeHeader(h);
-        if (!stationCol && (nh === "estación" || nh === "estacion")) {
+        if (!stationCol && nh.startsWith("estac")) {
           stationCol = h;
         }
-        if (
-          !costCol &&
-          nh.includes("costo") &&
-          nh.includes("carril")
-        ) {
-          costCol = h;
+        if (!costPerLaneCol && nh.includes("costopromedioporcarril")) {
+          costPerLaneCol = h;
+        }
+        if (!totalLanesCol && nh.includes("totalcarriles")) {
+          totalLanesCol = h;
+        }
+        if (!diffBaseCol && nh === "diferenciacosto") {
+          diffBaseCol = h;
+        }
+        if (!diffX2Col && nh === "diferenciacostox2") {
+          diffX2Col = h;
+        }
+        if (!diffX3Col && nh === "diferenciacostox3") {
+          diffX3Col = h;
+        }
+        if (!maxInactiveCol && nh === "maxcarrilesinactivos") {
+          maxInactiveCol = h;
         }
       });
 
-      // Si encontramos ambas columnas, usamos el CSV
-      if (stationCol && costCol) {
-        rows.forEach((r) => {
-          const st = (r[stationCol] || "").trim();
-          const cStr = r[costCol];
-          const val = parseCurrency(cStr);
-          if (st && !isNaN(val)) {
-            labels.push(st);
-            data.push(val);
+      rows.forEach((r) => {
+        const st = (r[stationCol] || "").trim();
+        if (!st) return;
+
+        const costPerLane = parseCurrency(r[costPerLaneCol]);
+        const totalLanes = parseInt(r[totalLanesCol], 10);
+        const maxInactive = parseInt(r[maxInactiveCol], 10);
+
+        let savingsStr = null;
+        if (!isNaN(maxInactive)) {
+          if (maxInactive === 2 && diffX2Col) {
+            savingsStr = r[diffX2Col];
+          } else if (maxInactive === 3 && diffX3Col) {
+            savingsStr = r[diffX3Col];
+          } else if (maxInactive === 1 && diffBaseCol) {
+            savingsStr = r[diffBaseCol];
           }
+        }
+        if (!savingsStr && diffBaseCol) {
+          savingsStr = r[diffBaseCol];
+        }
+
+        const savings = parseCurrency(savingsStr);
+
+        valueData.push({
+          station: st,
+          costPerLane: !isNaN(costPerLane) ? costPerLane : NaN,
+          totalLanes: !isNaN(totalLanes) ? totalLanes : NaN,
+          maxInactiveLanes: !isNaN(maxInactive) ? maxInactive : 0,
+          savings: !isNaN(savings) ? savings : NaN,
         });
-      }
+      });
     }
   } catch (err) {
     console.error("Error cargando 'Costos por carril 01.csv':", err);
   }
 
-  // Si algo falla o sale vacío, usamos el fallback estático
-  if (!labels.length || !data.length) {
-    labels = STATIC_COST_DATA.map((d) => d.station);
-    data = STATIC_COST_DATA.map((d) => d.cost);
+  if (!valueData.length) {
+    valueData = STATIC_COST_DATA.map((d) => ({
+      station: d.station,
+      costPerLane: d.cost,
+      totalLanes: NaN,
+      maxInactiveLanes: 0,
+      savings: NaN,
+    }));
   }
 
-  // Gráfico de barras
-  if (valueBarChart) {
-    valueBarChart.destroy();
+  // Poblar selector de estación
+  stationSelect.innerHTML = "";
+  valueData.forEach((d) => {
+    const opt = document.createElement("option");
+    opt.value = d.station;
+    opt.textContent = d.station;
+    stationSelect.appendChild(opt);
+  });
+
+  function refreshStationVisibility() {
+    if (modeSelect.value === "estacion") {
+      stationRow.style.display = "flex";
+    } else {
+      stationRow.style.display = "none";
+    }
   }
-  const ctxBar = barCanvas.getContext("2d");
-  valueBarChart = new Chart(ctxBar, {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [
-        {
-          label: "Costo promedio por carril (COP)",
-          data,
-          borderWidth: 1,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        x: {
-          title: {
-            display: true,
-            text: "Estación",
+
+  function updateCostChartFromControls() {
+    const ctx = barCanvas.getContext("2d");
+    const mode = modeSelect.value;
+    let labels = [];
+    let data = [];
+
+    if (mode === "general") {
+      labels = valueData.map((d) => d.station);
+      data = valueData.map((d) => d.costPerLane);
+
+      if (costSummaryDiv) {
+        costSummaryDiv.innerHTML = `
+          <p>Vista general del costo promedio por carril para
+          <strong>${valueData.length}</strong> estaciones.</p>
+          <p>Cada barra representa el costo anual de mantener un carril operativo en la estación correspondiente.</p>
+        `;
+      }
+    } else {
+      const stName = stationSelect.value;
+      const item = valueData.find((d) => d.station === stName);
+      if (!item) return;
+
+      labels = [item.station];
+      data = [item.costPerLane];
+
+      const lanes = isNaN(item.totalLanes) ? "N/D" : item.totalLanes;
+      const maxInactive = item.maxInactiveLanes || 0;
+
+      if (costSummaryDiv) {
+        costSummaryDiv.innerHTML = `
+          <p><strong>Estación:</strong> ${item.station}</p>
+          <p>
+            Costo promedio por carril ≈
+            <strong>${Math.round(item.costPerLane).toLocaleString("es-CO")}</strong> COP/año.
+          </p>
+          <p>
+            Total de carriles instalados: <strong>${lanes}</strong>
+            ${
+              maxInactive
+                ? ` · Carriles que potencialmente pueden quedar inactivos con el esquema propuesto: <strong>${maxInactive}</strong>.`
+                : ""
+            }
+          </p>
+        `;
+      }
+    }
+
+    if (valueCostChart) {
+      valueCostChart.destroy();
+    }
+
+    valueCostChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Costo promedio por carril (COP)",
+            data,
+            borderWidth: 1,
           },
-        },
-        y: {
-          beginAtZero: false,
-          title: {
-            display: true,
-            text: "COP",
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: "Estación",
+            },
+          },
+          y: {
+            beginAtZero: false,
+            title: {
+              display: true,
+              text: "COP/año por carril",
+            },
           },
         },
       },
-    },
-  });
-
-  // Gráfico de pie (participación)
-  if (valuePieChart) {
-    valuePieChart.destroy();
+    });
   }
-  const ctxPie = pieCanvas.getContext("2d");
-  valuePieChart = new Chart(ctxPie, {
-    type: "pie",
-    data: {
-      labels,
-      datasets: [
-        {
-          label: "Participación en costo promedio por carril",
-          data,
+
+  function updateSavingsChart() {
+    const ctx = savingsCanvas.getContext("2d");
+
+    const labels = valueData.map((d) => d.station);
+    const data = valueData.map((d) =>
+      isNaN(d.savings) ? 0 : d.savings
+    );
+
+    if (savingsSummaryDiv) {
+      savingsSummaryDiv.innerHTML = `
+        <p>
+          Ahorros anuales estimados por estación al operar con el número óptimo de carriles
+          (según el máximo de carriles inactivos permitido por la demanda). 
+        </p>
+        <p>
+          Cada barra corresponde al valor de <strong>Diferencia de Costo</strong> asociado
+          al escenario de mayor ahorro admisible en <code>Costos por carril 01.csv</code>.
+        </p>
+      `;
+    }
+
+    if (valueSavingsChart) {
+      valueSavingsChart.destroy();
+    }
+
+    valueSavingsChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Ahorro anual estimado (COP)",
+            data,
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: "Estación",
+            },
+          },
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: "COP/año",
+            },
+          },
         },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-    },
+      },
+    });
+  }
+
+  modeSelect.addEventListener("change", () => {
+    refreshStationVisibility();
+    updateCostChartFromControls();
   });
+  stationSelect.addEventListener("change", updateCostChartFromControls);
+
+  modeSelect.value = "general";
+  refreshStationVisibility();
+  updateCostChartFromControls();
+  updateSavingsChart();
 }
 
 // ========== Init global ==========
@@ -1463,18 +1580,13 @@ async function initValueSection() {
 document.addEventListener("DOMContentLoaded", async () => {
   setupNavigation();
 
-  // Gráficos de análisis exploratorio
   const resumenGraficas = await cargarResumen();
   crearGraficos(resumenGraficas);
 
-  // Sección de modelos (resumen, trafico_limpio, selector de peaje/sentido)
   await initModelsSummary();
   await initTraficoSummary();
   setupPeajeSelector();
 
-  // Sección de generación de valor
   await initValueSection();
-
-  // Interfaz del operario (por día)
   await initOperatorInterface();
 });

@@ -196,77 +196,51 @@
       <section id="view-value" class="view-section">
         <div class="container">
           <section class="grid">
-            <!-- Tabla estática -->
+            <!-- Costos promedio por carril -->
             <article class="card">
               <h2>Costos promedio por carril</h2>
-              <p>Tabla de costos promedio por carril, sin modificaciones.</p>
-              <div class="table-wrapper">
-                <table class="cost-table">
-                  <thead>
-                    <tr>
-                      <th>ESTACIÓN</th>
-                      <th>Costo promedio por carril</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>PTO. TRIUNFO</td>
-                      <td>$&nbsp;81.664.906</td>
-                    </tr>
-                    <tr>
-                      <td>SACHICA</td>
-                      <td>$&nbsp;61.294.159</td>
-                    </tr>
-                    <tr>
-                      <td>CASABLANCA</td>
-                      <td>$&nbsp;72.967.956</td>
-                    </tr>
-                    <tr>
-                      <td>TUNEL DE LA LÍNEA - QUINDIO</td>
-                      <td>$&nbsp;61.499.239</td>
-                    </tr>
-                    <tr>
-                      <td>CERRITOS II</td>
-                      <td>$&nbsp;60.477.325</td>
-                    </tr>
-                    <tr>
-                      <td>TUNEL DE LA LÍNEA - TOLIMA</td>
-                      <td>$&nbsp;60.603.212</td>
-                    </tr>
-                    <tr>
-                      <td>BICENTENARIO</td>
-                      <td>$&nbsp;61.844.399</td>
-                    </tr>
-                    <tr>
-                      <td>LA PARADA</td>
-                      <td>$&nbsp;62.700.053</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </article>
-
-            <!-- Gráfico de barras costos promedio -->
-            <article class="card">
-              <h2>Costo promedio por carril por estación</h2>
               <p>
-                Comparación visual del costo promedio por carril para cada estación,
-                a partir de <code>Costos por carril 01.csv</code>.
+                Visualización del costo promedio por carril. Puedes ver una vista general
+                o seleccionar una estación específica para ver su costo y el número de carriles.
               </p>
+
+              <div class="selector-row">
+                <div class="trafico-mode-row">
+                  <label for="value-mode">Vista:&nbsp;</label>
+                  <select id="value-mode">
+                    <option value="general">General (todas las estaciones)</option>
+                    <option value="estacion">Por estación</option>
+                  </select>
+                </div>
+                <div class="peaje-select-row value-station-row" style="display: none;">
+                  <label for="value-station-select">Estación:&nbsp;</label>
+                  <select id="value-station-select"></select>
+                </div>
+              </div>
+
+              <div id="value-cost-summary" class="small-text" style="margin-top: 0.5rem;">
+                Cargando costos promedio por carril...
+              </div>
+
               <div class="chart-wrapper">
                 <canvas id="value-cost-bar"></canvas>
               </div>
             </article>
 
-            <!-- Gráfico de pie participación -->
+            <!-- Ahorros por estación -->
             <article class="card">
-              <h2>Participación relativa de costos</h2>
+              <h2>Ahorros estimados por estación</h2>
               <p>
-                Distribución del costo promedio por carril entre estaciones,
-                a partir de <code>Costos por carril 01.csv</code>.
+                Ahorros anuales estimados por estación al implementar el esquema de operación
+                propuesto (uso eficiente de carriles).
               </p>
+
+              <div id="value-savings-summary" class="small-text" style="margin-top: 0.5rem;">
+                Cargando ahorros estimados...
+              </div>
+
               <div class="chart-wrapper">
-                <canvas id="value-cost-pie"></canvas>
+                <canvas id="value-savings-bar"></canvas>
               </div>
             </article>
           </section>

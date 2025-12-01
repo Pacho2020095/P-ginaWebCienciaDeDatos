@@ -110,7 +110,7 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
 
-/* Tarjetas genéricas (gráficos y placeholders) */
+/* Tarjetas genéricas */
 .card,
 .placeholder-card {
   background: #fff;
@@ -183,7 +183,7 @@ footer {
   color: #444;
 }
 
-/* Fila de selectores (en modelos, tráfico, operario) */
+/* Fila de selectores */
 .selector-row {
   margin-top: 0.4rem;
   display: flex;
@@ -264,13 +264,13 @@ footer {
 .operator-arrow.up {
   border-left: 10px solid transparent;
   border-right: 10px solid transparent;
-  border-bottom: 18px solid #facc15; /* amarillo */
+  border-bottom: 18px solid #facc15;
 }
 
 .operator-arrow.down {
   border-left: 10px solid transparent;
   border-right: 10px solid transparent;
-  border-top: 18px solid #60a5fa; /* azul */
+  border-top: 18px solid #60a5fa;
 }
 
 .operator-lane-empty {
@@ -328,7 +328,7 @@ footer {
   flex-shrink: 0;
 }
 
-/* Tabla de costos */
+/* Tabla de costos (ya no se usa, pero puede quedarse) */
 .table-wrapper {
   margin-top: 0.5rem;
   max-height: 320px;
