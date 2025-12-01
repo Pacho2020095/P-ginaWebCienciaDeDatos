@@ -1103,7 +1103,7 @@ async function buildOperatorData() {
   operatorYears = Array.from(yearsSet).sort((a, b) => Number(a) - Number(b));
 }
 
-function buildOperatorLayoutHTML(peajeKey, lanes1, lanes2) {
+function buildOperatorLayoutHTML(peajeKey, lanes1, lanes2, isModelZone) {
   const totalLanes1 = lanes1 || 0;
   const totalLanes2 = lanes2 || 0;
   const total = totalLanes1 + totalLanes2;
@@ -1123,7 +1123,26 @@ function buildOperatorLayoutHTML(peajeKey, lanes1, lanes2) {
     const isSent1 = i < totalLanes1;
     const arrowTop = isSent1 ? "" : `<div class="operator-arrow up"></div>`;
     const arrowBottom = isSent1 ? `<div class="operator-arrow down"></div>` : "";
-    const label = isSent1 ? "Sentido 1" : "Sentido 2";
+    let label = isSent1 ? "Sentido 1" : "Sentido 2";
+
+    // Lógica especial para Tunel de la Linea
+    if (peajeKey === "Tunel de la Linea") {
+      if (isSent1) {
+        if (!isModelZone) {
+          label = "Sentido 1 (Tolima)";
+        } else {
+          label =
+            "Sentido 1 (Tolima · y_pred: resultados_peaje_tunel_la_linea_tolima_sentido_1)";
+        }
+      } else {
+        if (!isModelZone) {
+          label = "Sentido 2 (Quindío)";
+        } else {
+          label =
+            "Sentido 2 (Quindío · y_pred: resultados_peaje_tunel_la_linea_quindio_sentido_2)";
+        }
+      }
+    }
 
     html += `
       <div class="operator-lane">
@@ -1213,6 +1232,8 @@ function updateOperatorView() {
     (s1 && s1.fromModel && lanes1 !== null) ||
     (s2 && s2.fromModel && lanes2 !== null);
 
+  const isModelZone = dateKey >= MODEL_ZONE_START;
+
   resultDiv.innerHTML = `
     <p><strong>Peaje:</strong> ${peajeKey}</p>
     <p><strong>Fecha de operación:</strong> ${day} de ${monthLabel} de ${year}</p>
@@ -1231,7 +1252,12 @@ function updateOperatorView() {
     }
   `;
 
-  layoutDiv.innerHTML = buildOperatorLayoutHTML(peajeKey, lanes1 || 0, lanes2 || 0);
+  layoutDiv.innerHTML = buildOperatorLayoutHTML(
+    peajeKey,
+    lanes1 || 0,
+    lanes2 || 0,
+    isModelZone
+  );
 }
 
 async function initOperatorInterface() {
@@ -1402,7 +1428,6 @@ async function initValueSection() {
     }));
   }
 
-  // Poblar selector de estación
   stationSelect.innerHTML = "";
   valueData.forEach((d) => {
     const opt = document.createElement("option");
