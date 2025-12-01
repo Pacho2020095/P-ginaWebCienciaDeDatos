@@ -1125,21 +1125,21 @@ function buildOperatorLayoutHTML(peajeKey, lanes1, lanes2, isModelZone) {
     const arrowBottom = isSent1 ? `<div class="operator-arrow down"></div>` : "";
     let label = isSent1 ? "Sentido 1" : "Sentido 2";
 
-    // Lógica especial para Tunel de la Linea
+    // Etiquetas compactas para Tunel de la Linea
     if (peajeKey === "Tunel de la Linea") {
       if (isSent1) {
+        // Sentido 1 = Tolima
         if (!isModelZone) {
-          label = "Sentido 1 (Tolima)";
+          label = "S1 (TOL)";
         } else {
-          label =
-            "Sentido 1 (Tolima · y_pred: resultados_peaje_tunel_la_linea_tolima_sentido_1)";
+          label = "S1 (TOL · y_pred tolima_s1)";
         }
       } else {
+        // Sentido 2 = Quindío
         if (!isModelZone) {
-          label = "Sentido 2 (Quindío)";
+          label = "S2 (QUI)";
         } else {
-          label =
-            "Sentido 2 (Quindío · y_pred: resultados_peaje_tunel_la_linea_quindio_sentido_2)";
+          label = "S2 (QUI · y_pred quindio_s2)";
         }
       }
     }
