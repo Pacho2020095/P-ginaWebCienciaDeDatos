@@ -11,7 +11,6 @@ const MONTH_LABELS = [
   "Sep",
   "Oct",
   "Nov",
-  "Dic",
 ];
 
 // Meses completos (para selects del operario)
@@ -32,6 +31,9 @@ const MONTH_FULL = [
 
 // Años para el gráfico 1 (EDA)
 const YEAR_RANGE = ["2021", "2022", "2023", "2024", "2025"];
+
+// Fecha a partir de la cual usamos y_pred como salida del modelo
+const MODEL_ZONE_START = "2025-09-16";
 
 // Mapping de peaje -> { sentido -> archivo CSV }
 const PEAJE_MODEL_FILES = {
@@ -75,7 +77,8 @@ let peajeModelChart = null;
 // Datos crudos
 let traficoRows = null;
 let modelsRows = null; // resumen_metricas_modelos.csv
-let operatorData = null; // {peaje: {dateKey: { s1: {traffic,fromModel}, s2: {...} }}}
+// {peaje: {dateKey: { s1: {traffic,fromModel}, s2: {traffic,fromModel} }}}
+let operatorData = null;
 let operatorYears = []; // años disponibles en los modelos (para el select)
 
 // ========== Utilidades generales ==========
@@ -1010,9 +1013,8 @@ async function buildOperatorData() {
   for (const [peajeKey, sentidosObj] of entries) {
     operatorData[peajeKey] = operatorData[peajeKey] || {};
 
-    // Usar cada archivo una sola vez
-    const filesSet = new Set(Object.values(sentidosObj));
-    for (const file of filesSet) {
+    // Ahora recorremos explícitamente cada sentido y su archivo
+    for (const [senseKey, file] of Object.entries(sentidosObj)) {
       try {
         const { rows } = await loadCSV(file);
         if (!rows.length) continue;
@@ -1027,69 +1029,63 @@ async function buildOperatorData() {
           const dateKey = canonicalDateKey(year, month, day);
           yearsSet.add(yearKey);
 
-          const isModelZone = dateKey >= "2025-09-16";
+          const isModelZone = dateKey >= MODEL_ZONE_START;
 
-          const s1Raw = r.sentido_1 ?? r.SENTIDO_1;
-          const s2Raw = r.sentido_2 ?? r.SENTIDO_2;
+          let value = null;
+          let fromModel = false;
 
-          let v1 = null;
-          let v2 = null;
-          let m1 = false;
-          let m2 = false;
-
-          if (!isModelZone) {
-            if (s1Raw !== undefined && s1Raw !== "") {
-              const n1 = parseFloat(s1Raw);
-              if (!isNaN(n1)) v1 = n1;
+          if (isModelZone) {
+            // Desde 16/09/2025 en adelante: usamos y_pred del archivo
+            const yp = parseFloat(r.y_pred);
+            if (!isNaN(yp)) {
+              value = yp;
+              fromModel = true;
             }
-            if (s2Raw !== undefined && s2Raw !== "") {
-              const n2 = parseFloat(s2Raw);
-              if (!isNaN(n2)) v2 = n2;
+          } else {
+            // Antes de esa fecha: intentamos leer sentido_1/sentido_2 según el archivo
+            const colName =
+              senseKey === "1" ? "sentido_1" : "sentido_2";
+            const colUpper = colName.toUpperCase();
+
+            let raw = r[colName];
+            if (raw === undefined || raw === "") {
+              raw = r[colUpper];
+            }
+
+            if (raw !== undefined && raw !== "") {
+              const n = parseFloat(raw);
+              if (!isNaN(n)) {
+                value = n;
+                fromModel = false; // datos históricos / desagregados
+              }
+            }
+
+            // Si no hubiera esa columna, como respaldo podríamos usar y_pred,
+            // pero LO MARCAMOS como modelo sólo si también está en la zona de modelo.
+            if (value === null || value === undefined) {
+              const yp = parseFloat(r.y_pred);
+              if (!isNaN(yp)) {
+                value = yp;
+                // fecha < MODEL_ZONE_START: considerar como derivado pero sin bombillo
+                fromModel = false;
+              }
             }
           }
 
-          const ypred = parseFloat(r.y_pred);
-          if (isModelZone && !isNaN(ypred)) {
-            const half = ypred / 2;
-            v1 = half;
-            v2 = half;
-            m1 = true;
-            m2 = true;
-          } else if (!isNaN(ypred)) {
-            const half = ypred / 2;
-            if (v1 === null) {
-              v1 = half;
-              m1 = true;
-            }
-            if (v2 === null) {
-              v2 = half;
-              m2 = true;
-            }
-          }
-
-          if (v1 === null && v2 === null) return;
+          if (value === null) return;
 
           if (!operatorData[peajeKey][dateKey]) {
             operatorData[peajeKey][dateKey] = { s1: null, s2: null };
           }
-
           const slot = operatorData[peajeKey][dateKey];
+          const key = senseKey === "1" ? "s1" : "s2";
 
-          if (v1 !== null) {
-            if (!slot.s1) {
-              slot.s1 = { traffic: v1, fromModel: m1 };
-            } else {
-              slot.s1.traffic = (slot.s1.traffic + v1) / 2;
-              slot.s1.fromModel = slot.s1.fromModel || m1;
-            }
-          }
-          if (v2 !== null) {
-            if (!slot.s2) {
-              slot.s2 = { traffic: v2, fromModel: m2 };
-            } else {
-              slot.s2.traffic = (slot.s2.traffic + v2) / 2;
-              slot.s2.fromModel = slot.s2.fromModel || m2;
-            }
+          if (!slot[key]) {
+            slot[key] = { traffic: value, fromModel };
+          } else {
+            // Si hay varios registros para la misma fecha/sentido, promediamos
+            slot[key].traffic = (slot[key].traffic + value) / 2;
+            slot[key].fromModel = slot[key].fromModel || fromModel;
           }
         });
       } catch (err) {
@@ -1225,7 +1221,7 @@ function updateOperatorView() {
       usesModel
         ? `<div class="model-indicator">
              <span class="model-lamp"></span>
-             <span>Para esta fecha se usan valores <strong>estimados por el modelo</strong> (<code>y_pred</code>), repartidos en partes iguales entre los sentidos 1 y 2.</span>
+             <span>Para esta fecha se usan valores <strong>estimados por el modelo</strong> (<code>y_pred</code>) de cada sentido por separado.</span>
            </div>`
         : ""
     }
